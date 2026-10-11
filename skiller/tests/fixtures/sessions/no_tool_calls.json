@@ -1,0 +1,143 @@
+{
+ "meta": {
+  "id": "session_notools0000001",
+  "title": "Talk only",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 4,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:00:54.000Z",
+  "running": false,
+  "highWaterSeq": 12
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Explain SQL injection."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection",
+    "skill_workflow": {
+     "skillId": "sql_injection",
+     "revision": 1,
+     "changeSetId": null
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Thinking 0",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "ask_user",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 6,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:24.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Thinking 1",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "ask_user",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:32.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "Thinking 2",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "ask_user",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 10,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:40.000Z",
+   "data": {
+    "iteration": 4,
+    "phase": "informational",
+    "thought": "Thinking 3",
+    "reasoning": "Reasoning for turn 4.",
+    "action": "ask_user",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 11,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:00:47.000Z",
+   "data": {
+    "content": "Explained.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "summary"
+   }
+  },
+  {
+   "seq": 12,
+   "type": "task_complete",
+   "at": "2026-10-10T09:00:54.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 4
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 9,
+  "droppedEvents": 3
+ },
+ "untrusted": true
+}

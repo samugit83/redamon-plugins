@@ -1,0 +1,246 @@
+{
+ "meta": {
+  "id": "session_noattackpath001",
+  "title": "No label",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 4,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:01:06.000Z",
+  "running": false,
+  "highWaterSeq": 20
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Test shop.example.com."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Probe 0",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/0'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/0'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Probe 1",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 9,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:28.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/1'"
+    },
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:31.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/1'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 12,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:38.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "Probe 2",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:39.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/2'"
+    },
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 15,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:42.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/2'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:49.000Z",
+   "data": {
+    "iteration": 4,
+    "phase": "informational",
+    "thought": "Probe 3",
+    "reasoning": "Reasoning for turn 4.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 17,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:50.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/3'"
+    },
+    "step_id": "step-0004-execute_curl"
+   }
+  },
+  {
+   "seq": 18,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:52.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/3'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0004-execute_curl"
+   }
+  },
+  {
+   "seq": 19,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:00:59.000Z",
+   "data": {
+    "content": "Done.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 20,
+   "type": "task_complete",
+   "at": "2026-10-10T09:01:06.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 4
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 16,
+  "droppedEvents": 4
+ },
+ "untrusted": true
+}

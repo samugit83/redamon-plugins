@@ -1,0 +1,272 @@
+{
+ "meta": {
+  "id": "session_defensive00001",
+  "title": "Defensive",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 3,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:01:44.000Z",
+  "running": false,
+  "highWaterSeq": 23
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Test shop.example.com for SQL injection."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection",
+    "skill_workflow": {
+     "skillId": "sql_injection",
+     "revision": 1,
+     "changeSetId": null
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Probe one.",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Probe two.",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 9,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:28.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "tool_args": {
+     "command": "sqlmap -u x"
+    },
+    "step_id": "step-0002-kali_shell"
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:31.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "success": false,
+    "output_summary": "failed",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "step_id": "step-0002-kali_shell"
+   }
+  },
+  {
+   "seq": 12,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:38.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "Probe three.",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:39.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s y"
+    },
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 14,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:41.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s y"
+    },
+    "raw_output": "z",
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 15,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:48.000Z",
+   "data": {
+    "truncated": true,
+    "preview": "{\"tool_name\":\"kali_shell\",\"raw_output\":\"AAAA"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:55.000Z",
+   "data": "not an object"
+  },
+  {
+   "seq": 17,
+   "type": "thinking",
+   "at": "2026-10-10T09:01:02.000Z",
+   "data": {
+    "iteration": "4",
+    "phase": null,
+    "thought": [
+     "a",
+     "list"
+    ],
+    "productivity_tier": 5
+   }
+  },
+  {
+   "seq": 18,
+   "type": "tool_start",
+   "at": "2026-10-10T09:01:09.000Z",
+   "data": {
+    "tool_name": null,
+    "tool_args": "a string"
+   }
+  },
+  {
+   "seq": 19,
+   "type": "something_new",
+   "at": "2026-10-10T09:01:16.000Z",
+   "data": {
+    "x": 1
+   }
+  },
+  {
+   "seq": 20,
+   "type": "deep_think",
+   "at": "2026-10-10T09:01:23.000Z",
+   "data": {}
+  },
+  {
+   "seq": 21,
+   "type": "guidance",
+   "at": "2026-10-10T09:01:30.000Z",
+   "data": {
+    "content": null
+   }
+  },
+  {
+   "seq": 22,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:01:37.000Z",
+   "data": {
+    "content": "Done.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 23,
+   "type": "task_complete",
+   "at": "2026-10-10T09:01:44.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 3
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 21,
+  "droppedEvents": 2
+ },
+ "untrusted": true
+}

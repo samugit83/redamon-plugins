@@ -1,0 +1,139 @@
+{
+ "meta": {
+  "id": "session_short000000001",
+  "title": "Short",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 2,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:00:41.000Z",
+  "running": false,
+  "highWaterSeq": 10
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Test shop.example.com."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection",
+    "skill_workflow": {
+     "skillId": "sql_injection",
+     "revision": 1,
+     "changeSetId": null
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Look.",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Done looking.",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "complete",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 9,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:00:34.000Z",
+   "data": {
+    "content": "Nothing found.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "summary"
+   }
+  },
+  {
+   "seq": 10,
+   "type": "task_complete",
+   "at": "2026-10-10T09:00:41.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 2
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 9,
+  "droppedEvents": 1
+ },
+ "untrusted": true
+}

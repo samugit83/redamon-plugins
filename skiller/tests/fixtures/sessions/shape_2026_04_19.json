@@ -1,0 +1,277 @@
+{
+ "meta": {
+  "id": "session_shape0419000001",
+  "title": "April session",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 3,
+  "createdAt": "2026-04-20T10:00:00Z",
+  "updatedAt": "2026-04-20T10:01:30.000Z",
+  "running": false,
+  "highWaterSeq": 21
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-04-20T10:00:07.000Z",
+   "data": {
+    "content": "Test shop.example.com for SQL injection."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-04-20T10:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": ""
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-04-20T10:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection"
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-04-20T10:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Probe 0",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-04-20T10:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP0'"
+    }
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-04-20T10:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP0'"
+    },
+    "raw_output": "500"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-04-20T10:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Probe 1",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310
+   }
+  },
+  {
+   "seq": 9,
+   "type": "tool_start",
+   "at": "2026-04-20T10:00:28.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP1'"
+    }
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_complete",
+   "at": "2026-04-20T10:00:31.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP1'"
+    },
+    "raw_output": "500"
+   }
+  },
+  {
+   "seq": 12,
+   "type": "thinking",
+   "at": "2026-04-20T10:00:38.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "Probe 2",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_start",
+   "at": "2026-04-20T10:00:39.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP2'"
+    }
+   }
+  },
+  {
+   "seq": 14,
+   "type": "fireteam_deployed",
+   "at": "2026-04-20T10:00:46.000Z",
+   "data": {
+    "fireteam_id": "ft-old",
+    "iteration": 3,
+    "plan_rationale": "Split.",
+    "member_count": 1,
+    "members": [
+     {
+      "member_id": "m1",
+      "name": "Prober",
+      "task": "Probe.",
+      "skills": [
+       "execute_curl"
+      ],
+      "max_iterations": 3
+     }
+    ]
+   }
+  },
+  {
+   "seq": 15,
+   "type": "fireteam_thinking",
+   "at": "2026-04-20T10:00:53.000Z",
+   "data": {
+    "fireteam_id": "ft-old",
+    "member_id": "m1",
+    "name": "Prober",
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Try a boolean pair.",
+    "reasoning": "r"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "fireteam_tool_start",
+   "at": "2026-04-20T10:01:00.000Z",
+   "data": {
+    "fireteam_id": "ft-old",
+    "member_id": "m1",
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s x"
+    },
+    "wave_id": null,
+    "step_index": null
+   }
+  },
+  {
+   "seq": 17,
+   "type": "fireteam_tool_complete",
+   "at": "2026-04-20T10:01:07.000Z",
+   "data": {
+    "fireteam_id": "ft-old",
+    "member_id": "m1",
+    "tool_name": "execute_curl",
+    "success": true,
+    "duration_ms": 0,
+    "output_excerpt": "ok",
+    "wave_id": null,
+    "step_index": null
+   }
+  },
+  {
+   "seq": 18,
+   "type": "fireteam_member_completed",
+   "at": "2026-04-20T10:01:14.000Z",
+   "data": {
+    "fireteam_id": "ft-old",
+    "member_id": "m1",
+    "name": "Prober",
+    "status": "success",
+    "iterations_used": 1,
+    "tokens_used": 10,
+    "findings_count": 0,
+    "wall_clock_seconds": 3.0,
+    "error_message": null
+   }
+  },
+  {
+   "seq": 19,
+   "type": "tool_complete",
+   "at": "2026-04-20T10:01:16.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP2'"
+    },
+    "raw_output": "500"
+   }
+  },
+  {
+   "seq": 20,
+   "type": "assistant_message",
+   "at": "2026-04-20T10:01:23.000Z",
+   "data": {
+    "content": "Done.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 21,
+   "type": "task_complete",
+   "at": "2026-04-20T10:01:30.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 3
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 19,
+  "droppedEvents": 2
+ },
+ "untrusted": true
+}

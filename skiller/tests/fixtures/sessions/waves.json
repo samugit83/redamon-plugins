@@ -1,0 +1,319 @@
+{
+ "meta": {
+  "id": "session_waves00000001",
+  "title": "Parallel probes",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 3,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:01:19.000Z",
+  "running": false,
+  "highWaterSeq": 23
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Test shop.example.com."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection",
+    "skill_workflow": {
+     "skillId": "sql_injection",
+     "revision": 1,
+     "changeSetId": null
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Map it.",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Probe three parameters at once.",
+    "reasoning": "",
+    "action": "plan_tools",
+    "input_tokens": 1,
+    "output_tokens": 1,
+    "productivity_score": 0.6,
+    "productivity_tier": "yellow",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 9,
+   "type": "plan_start",
+   "at": "2026-10-10T09:00:34.000Z",
+   "data": {
+    "wave_id": "wave-2",
+    "plan_rationale": "Run the probes in parallel.",
+    "tool_count": 3,
+    "tools": [
+     "execute_curl",
+     "execute_curl",
+     "execute_curl"
+    ]
+   }
+  },
+  {
+   "seq": 10,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:35.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?a=1%27'"
+    },
+    "wave_id": "wave-2",
+    "step_index": 0
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:36.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?b=1%27'"
+    },
+    "wave_id": "wave-2",
+    "step_index": 1
+   }
+  },
+  {
+   "seq": 12,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:37.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?c=1%27'"
+    },
+    "wave_id": "wave-2",
+    "step_index": 2
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:38.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": false,
+    "output_summary": "",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "wave_id": "wave-2",
+    "step_index": 0,
+    "duration_ms": 1500,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?a=1%27'"
+    },
+    "raw_output": "500"
+   }
+  },
+  {
+   "seq": 14,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:39.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "wave_id": "wave-2",
+    "step_index": 1,
+    "duration_ms": 1500,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?b=1%27'"
+    },
+    "raw_output": "200"
+   }
+  },
+  {
+   "seq": 15,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:40.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": false,
+    "output_summary": "",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "wave_id": "wave-2",
+    "step_index": 2,
+    "duration_ms": 1500,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/p?c=1%27'"
+    },
+    "raw_output": "500"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "plan_complete",
+   "at": "2026-10-10T09:00:47.000Z",
+   "data": {
+    "wave_id": "wave-2",
+    "total_steps": 3,
+    "successful": 1,
+    "failed": 2
+   }
+  },
+  {
+   "seq": 17,
+   "type": "plan_analysis",
+   "at": "2026-10-10T09:00:54.000Z",
+   "data": {
+    "wave_id": "wave-2",
+    "interpretation": "The wave finished.",
+    "actionable_findings": [],
+    "recommended_next_steps": []
+   }
+  },
+  {
+   "seq": 19,
+   "type": "thinking",
+   "at": "2026-10-10T09:01:02.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "Focus on a.",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 20,
+   "type": "tool_start",
+   "at": "2026-10-10T09:01:03.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/p?a=1' -p a --batch"
+    },
+    "step_id": "step-0003-kali_shell"
+   }
+  },
+  {
+   "seq": 21,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:01:05.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/p?a=1' -p a --batch"
+    },
+    "raw_output": "vulnerable",
+    "step_id": "step-0003-kali_shell"
+   }
+  },
+  {
+   "seq": 22,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:01:12.000Z",
+   "data": {
+    "content": "Parameter a is injectable.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 23,
+   "type": "task_complete",
+   "at": "2026-10-10T09:01:19.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 3
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 21,
+  "droppedEvents": 2
+ },
+ "untrusted": true
+}

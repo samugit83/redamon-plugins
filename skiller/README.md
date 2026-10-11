@@ -108,6 +108,18 @@ installed and enabled. Version numbers are never reused.
 A result of `no_improvement` is not an error: the session held no lesson worth a new version,
 or did not fit the skill.
 
+## Tested against RedAmon
+
+On 2026-10-11, Skiller 1.0.0 was installed from files (signed with a development key) on a
+local RedAmon with platform 1.0.0 and driven end to end by RedAmon's
+`testing/e2e/tests/pluginsSkiller.spec.ts`, with a scripted stub model: a session analysed from
+the chat's gear menu (the job named the skill and "v1" first), the proposal reviewed and
+approved, a second run on top of it, the versions window (delete, reset to factory), a third
+run numbered after every number already used, the model chooser when no model is set, and
+uninstall keeping the data, reinstall restoring the approved version, uninstall deleting
+everything. The evaluation harness ran on the same stack (see `eval/REPORT.md`). A real-model
+evaluation is still to do.
+
 ## Development
 
 ```bash

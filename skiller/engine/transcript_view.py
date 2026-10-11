@@ -153,6 +153,20 @@ def as_int(value) -> Optional[int]:
     return None
 
 
+_UNSTORABLE = re.compile("[\x00\ud800-\udfff]")
+
+
+def storable(value):
+    """`value` without what the Gateway refuses as `invalid_text`: U+0000 and unpaired surrogates."""
+    if isinstance(value, str):
+        return _UNSTORABLE.sub("", value)
+    if isinstance(value, dict):
+        return {storable(k): storable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [storable(v) for v in value]
+    return value
+
+
 def user_query(content: str) -> str:
     """The person's own words of a user message, without a skill's or graph node's context."""
     return _USER_QUERY_RE.sub("", content, count=1).strip()

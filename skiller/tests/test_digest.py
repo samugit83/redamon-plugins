@@ -174,3 +174,26 @@ def test_label_fallback_warning_is_in_the_facts():
 def test_user_query_context_prefixes_are_unwrapped():
     d = _build("shape_2026_08_05")
     assert "objective: Test shop.example.com for XSS." in d.text
+
+
+def test_a_long_session_digests_quickly_within_the_budget():
+    # A long run: hundreds of turns, most of them unremarkable (R-47); the budget forces drops.
+    import time
+
+    from fixtures.sessions_build import Session
+
+    s = Session("session_long000000000001", "Long run")
+    s.user("Test shop.example.com for SQL injection.")
+    s.classify("sql_injection")
+    for i in range(600):
+        s.turn(f"Probe {i} " + "t" * 300, "execute_curl", {"args": f"-s 'http://shop.example.com/p?id={i}'"},
+               raw="r" * 2000, summary="s" * 500, ok=i % 50 != 0)
+    s.report("Done.")
+    v = TranscriptView.from_transcript(s.transcript())
+    pick = skill_pick.choose(v)
+    started = time.monotonic()
+    d = digest.build(v, pick, nonce=NONCE, budget=20_000)
+    assert time.monotonic() - started < 3.0
+    assert len(d.text) <= 20_000 and d.omitted > 0
+    for flagged in (1, 51, 551):  # the failed calls stay
+        assert any(ln.startswith(f"#{flagged} ") for ln in d.text.splitlines()), flagged

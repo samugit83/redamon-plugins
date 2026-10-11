@@ -359,14 +359,25 @@ def _timeline(turns, signals: dict, budget: int) -> tuple:
         if size(lines) <= budget:
             return lines, omitted, False
     # Drop unflagged turns from the middle outwards, keeping the first and last ones longest.
+    # Sizes are measured once per turn, so a long session costs a few renders, not one per turn.
     unflagged = [t.n for t in turns if not flags[t.n]]
     order = sorted(unflagged, key=lambda n: abs(n - (unflagged[len(unflagged) // 2] if unflagged else 0)))
+    one_line = {t.n: size(_turn_lines(t, 1.0, True)) for t in turns if not flags[t.n]}
     keep = set(everyone)
+    estimate = size(lines)
+    gap_cost = 60
     for n in order:
         keep.discard(n)
+        estimate -= one_line[n]
+        if estimate + gap_cost > budget:
+            continue
         lines, omitted = render(1.0, True, keep)
-        if size(lines) <= budget:
+        estimate = size(lines)
+        if estimate <= budget:
             return lines, omitted, False
+    lines, omitted = render(1.0, True, keep)
+    if size(lines) <= budget:
+        return lines, omitted, False
     for scale in (0.5, 0.25):
         lines, omitted = render(scale, True, keep)
         if size(lines) <= budget:

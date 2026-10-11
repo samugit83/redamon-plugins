@@ -38,6 +38,14 @@ md5 conf cfg ini env log bak old orig swp tmp sql db sqlite mdb zip gz tgz tar r
 exe dll so bin pem key crt cer der p12 pfx csr csv tsv pdf doc docx xls xlsx ppt pptx yml yaml toml lock
 properties inc tpl twig vue git htaccess htpasswd config dat out err
 """.split())
+# A bare `name.tld` is taken for a host only with one of these endings, so code in tool output
+# (`os.path`, `response.text`) is not; hosts inside URLs and e-mail addresses always count.
+COMMON_TLDS = frozenset("""
+com net org edu gov mil int arpa io co ai app dev cloud tech site online xyz info biz me us uk de fr it es nl be
+ch at se no dk fi pl cz ru ua cn jp kr in br mx ar au nz ca eu asia top link live pro name fun pw cc tv ws ly to
+gg sh tk ml ga cf zip mov one host website space store shop blog news email systems network tools security
+local localdomain internal intranet lan corp home private test example invalid onion htb thm lab vm
+""".split())
 # Technology names written like hosts.
 NOT_HOSTS = frozenset({"asp.net", "ado.net", "vb.net", "node.js", "vue.js", "next.js", "nuxt.js", "react.js",
                        "express.js", "d3.js", "chart.js", "three.js", "socket.io", "e.g", "i.e"})
@@ -83,7 +91,7 @@ def _host_ok(host: str) -> bool:
     if h in NOT_HOSTS or _is_ip(h):
         return False
     tld = h.rsplit(".", 1)[-1]
-    return tld not in FILE_EXTENSIONS and not tld.isdigit()
+    return tld in COMMON_TLDS and tld not in FILE_EXTENSIONS
 
 
 def _strings(value, out: list, depth: int = 0) -> None:
@@ -171,6 +179,8 @@ def extract(view, exclude_texts=(), extra_text=()) -> Identifiers:
                 (add("ip", parts.hostname) if _is_ip(parts.hostname) else add("host", parts.hostname))
             if parts.path.count("/") >= 2 and parts.path.strip("/").count("/") >= 1:
                 add("path", parts.path.rstrip("/"))
+        for email_host in re.findall(r"@((?:[a-z0-9-]{1,63}\.)+[a-z]{2,24})\b", text, re.I):
+            add("host", email_host)
         for name, value in _QUERY_RE.findall(text):
             if not _PLAIN_NAME.match(name):
                 add("param", name)

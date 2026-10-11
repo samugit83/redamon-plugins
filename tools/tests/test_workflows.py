@@ -132,3 +132,20 @@ def test_ci_validates_and_tests_everything_without_secrets():
     assert "secrets." not in yaml.safe_dump(wf)
     scripts = "\n".join(step.get("run", "") for _, _, step in _steps(wf))
     assert "tools/validate.py" in scripts and "tools/run_tests.sh all" in scripts
+
+
+DEFAULT_BRANCH = "master"
+
+
+def test_every_workflow_uses_the_default_branch():
+    # The catalog URL every RedAmon reads names this branch; the workflows that write the
+    # catalog and the CI trigger must name the same one.
+    assert _triggers(_load("ci.yml"))["push"]["branches"] == [DEFAULT_BRANCH]
+    for name in ("release.yml", "catalog-refresh.yml"):
+        job = _signing_job(_load(name))
+        checkout = next(s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))
+        assert checkout["with"]["ref"] == DEFAULT_BRANCH, name
+        scripts = "\n".join(step.get("run", "") for step in job["steps"])
+        assert f"git push origin HEAD:{DEFAULT_BRANCH}" in scripts and f"git rebase origin/{DEFAULT_BRANCH}" in scripts
+    for name in NAMES:
+        assert not re.search(r"\bmain\b", (WORKFLOWS / name).read_text(encoding="utf-8")), f"{name} names main"

@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -58,7 +58,7 @@ jobs:
           CATALOG_SIGNING_KEY_ID: ${{ secrets.CATALOG_SIGNING_KEY_ID }}
         run: python tools/sign.py catalog.json
 
-      - name: Commit the catalog to main
+      - name: Commit the catalog to master
         if: steps.refresh.outputs.present == 'true'
         run: |
           set -euo pipefail
@@ -66,6 +66,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add catalog.json catalog.json.sig
           git commit -m "chore(catalog): refresh the expiry and the signature"
-          git fetch origin main
-          git rebase origin/main
-          git push origin HEAD:main
+          git fetch origin master
+          git rebase origin/master
+          git push origin HEAD:master

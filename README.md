@@ -96,7 +96,7 @@ tag, `release.yml`:
 3. creates the GitHub release with the archive;
 4. in the protected environment `release` (a reviewer approves): adds the release to
    `catalog.json`, increments `serial`, sets `expires` to 90 days, signs it, and commits
-   `catalog.json` and `catalog.json.sig` to `main`.
+   `catalog.json` and `catalog.json.sig` to `master`.
 
 Two tags pushed together queue in one concurrency group (`catalog`), so they never race on the
 catalog. `catalog-refresh.yml` re-signs the unchanged catalog monthly (and by hand) with a new
@@ -149,7 +149,7 @@ remove it when you are done. (Run these commands in `python:3.11-slim` too, for 
 3. Write tests with `FakeSdk` and `ScriptedLlm`; `tools/run_tests.sh <plugin>` and
    `tools/validate.py <plugin>` must pass.
 4. Add the folder to `.github/CODEOWNERS`.
-5. Merge to `main`, then push the tag `<plugin>-v<version>`.
+5. Merge to `master`, then push the tag `<plugin>-v<version>`.
 
 ## Licence
 

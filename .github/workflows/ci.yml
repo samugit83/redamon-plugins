@@ -1,10 +1,10 @@
-# Every push to main and every pull request: validate, test and pack every plugin, and test
+# Every push to master and every pull request: validate, test and pack every plugin, and test
 # the tools. No secret is available here.
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 permissions:

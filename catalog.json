@@ -1,0 +1,28 @@
+{
+  "catalogVersion": 1,
+  "serial": 1,
+  "expires": "2027-01-09T14:05:28Z",
+  "plugins": [
+    {
+      "id": "skiller",
+      "displayName": "Skiller",
+      "description": "Learns from an agent chat session and proposes a better, session-agnostic version of the built-in skill it used. Nothing changes until a person approves it.",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "platform": ">=1.0.0 <2.0.0",
+          "dataVersion": 1,
+          "url": "https://github.com/samugit83/redamon-plugins/releases/download/skiller-v1.0.0/skiller-1.0.0.tar.gz",
+          "sha256": "5e1aaa40ba89bf098b782232b49739c5710245ebe49fa00f76211bb803747b4b",
+          "size": 39852,
+          "permissions": [
+            "session:read",
+            "llm:invoke",
+            "override:skill.text"
+          ]
+        }
+      ]
+    }
+  ],
+  "revoked": []
+}

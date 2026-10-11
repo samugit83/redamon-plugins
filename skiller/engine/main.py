@@ -220,9 +220,8 @@ async def analyze_session(ctx, params):
     changelog = [guard.redact(c, ids) for c in changelog]
 
     async def propose(current_skill: _Skill, parts: dict) -> dict:
-        to_label = f"v{current_skill.from_revision + 1}"
         note = proposal.note(summary=summary, changelog=changelog, name=name, from_label=f"v{current_skill.from_revision}",
-                             to_label=to_label, lessons=len(lessons), dropped=dropped_lessons + dropped_edits)
+                             lessons=len(lessons), dropped=dropped_lessons + dropped_edits)
         meta_out = proposal.meta(summary=summary, changelog=changelog, lessons=lessons, guard=guard_counts,
                                  source_session_id=meta.get("id"), high_water_seq=meta.get("highWaterSeq"),
                                  session_revision=pick.get("revision"),

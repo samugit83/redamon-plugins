@@ -73,7 +73,7 @@ def test_proposes_a_snapshot_and_points_the_review_at_it():
     assert cs["scope"] == "user" and cs["targetGroup"] == "sql_injection"
     assert set(cs["parts"]) == {"tools"}
     assert "### Step 2: Run sqlmap (kali_shell)\nTest one parameter at a time" in cs["parts"]["tools"]
-    assert "**Skiller proposes v2 of SQL Injection**" in cs["note"]
+    assert cs["note"].startswith("Skiller's proposal for SQL Injection, built on v1.")
     meta = cs["meta"]
     assert meta["sourceSessionId"] == "session_5e1f7c2a9b3d4e60" and meta["sessionRevision"] == 1
     assert meta["sessionPredatesActive"] is False and meta["modelUsed"] == "scripted"

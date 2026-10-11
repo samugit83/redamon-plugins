@@ -37,8 +37,10 @@ def _cut(text, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def note(*, summary: str, changelog, name: str, from_label: str, to_label: str, lessons: int, dropped: int) -> str:
-    lines = [f"**Skiller proposes {to_label} of {name}** (built on {from_label}).", "", _cut(summary, SUMMARY_MAX_CHARS), ""]
+def note(*, summary: str, changelog, name: str, from_label: str, lessons: int, dropped: int) -> str:
+    """Plain text: the versions list shows notes unrendered. No version number of its own: the
+    platform numbers a version with a counter that is never reused (TD-19), unknown here."""
+    lines = [f"Skiller's proposal for {name}, built on {from_label}.", "", _cut(summary, SUMMARY_MAX_CHARS), ""]
     if changelog:
         lines.append("Changes:")
         lines += [f"- {_cut(c, CHANGE_MAX_CHARS)}" for c in list(changelog)[:MAX_CHANGES]]

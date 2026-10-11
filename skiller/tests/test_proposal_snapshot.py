@@ -27,11 +27,15 @@ def test_unchanged_compares_with_the_current_version_not_the_factory():
 
 def test_note_holds_summary_and_changes_within_the_platform_limit():
     note = proposal.note(summary="Two small changes.", changelog=["Add a thread limit.", "Confirm with a pair."],
-                         name="SQL Injection", from_label="v1", to_label="v2", lessons=3, dropped=1)
-    assert note.startswith("**Skiller proposes v2 of SQL Injection**")
+                         name="SQL Injection", from_label="v1", lessons=3, dropped=1)
+    # No version number of its own: the platform numbers versions with a counter that is never
+    # reused, so "v1 + 1" would be wrong after any deletion; and plain text, because the
+    # versions list shows notes unrendered.
+    assert note.startswith("Skiller's proposal for SQL Injection, built on v1.")
+    assert "*" not in note and "v2" not in note
     assert "Two small changes." in note and "- Add a thread limit." in note
     long_note = proposal.note(summary="s" * 5000, changelog=["c" * 500] * 30, name="X", from_label="v1",
-                              to_label="v2", lessons=1, dropped=0)
+                              lessons=1, dropped=0)
     assert len(long_note) <= proposal.NOTE_MAX_CHARS
 
 

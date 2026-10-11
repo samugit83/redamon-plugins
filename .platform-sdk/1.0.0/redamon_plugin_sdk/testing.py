@@ -321,7 +321,8 @@ class FakeGateway:
         active = active or self.active.get(("user", group))
         parts = [{"partId": pid, "text": e["text"],
                   "sha256": hashlib.sha256(e["text"].encode("utf-8")).hexdigest(),
-                  "chars": len(e["text"]), "maxChars": self._part_max(e)}
+                  "chars": len(e["text"]), "maxChars": self._part_max(e),
+                  "kind": e.get("kind", "plain"), "placeholders": list(e.get("placeholders", []))}
                  for pid, e in reg["parts"].items()]
         return {"point": point, "targetGroup": group, "displayName": reg.get("displayName", group),
                 "parts": parts, "active": copy.deepcopy(active),

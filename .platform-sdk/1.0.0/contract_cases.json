@@ -1612,18 +1612,32 @@
           "displayName": "Path Traversal",
           "parts": [
             {
+              "partId": "tools",
+              "text": "Scan with {timeout} s.",
+              "sha256": "9edf1ea4ffdaecd32a30a8f9ac1631c19581abe86832dfe30069d3202d815b1e",
+              "chars": 22,
+              "maxChars": 4000,
+              "kind": "template",
+              "placeholders": [
+                "timeout"
+              ]
+            },
+            {
               "partId": "payload_reference",
               "text": "Use ../ sequences.",
               "sha256": "f2a6ba335390c6906e1f98a5390d692d4644e6f66755ae720b89df0c15db9cc7",
               "chars": 18,
-              "maxChars": 4000
+              "maxChars": 4000,
+              "kind": "plain",
+              "placeholders": []
             }
           ],
           "active": null,
           "pendingCount": 0,
           "limits": {
-            "skillMaxChars": 27,
+            "skillMaxChars": 48,
             "parts": {
+              "tools": 4000,
               "payload_reference": 4000
             }
           }
@@ -1636,18 +1650,32 @@
           "displayName": "Path Traversal",
           "parts": [
             {
+              "partId": "tools",
+              "text": "Scan with {timeout} s.",
+              "sha256": "9edf1ea4ffdaecd32a30a8f9ac1631c19581abe86832dfe30069d3202d815b1e",
+              "chars": 22,
+              "maxChars": 4000,
+              "kind": "template",
+              "placeholders": [
+                "timeout"
+              ]
+            },
+            {
               "partId": "payload_reference",
               "text": "Use ../ sequences.",
               "sha256": "f2a6ba335390c6906e1f98a5390d692d4644e6f66755ae720b89df0c15db9cc7",
               "chars": 18,
-              "maxChars": 4000
+              "maxChars": 4000,
+              "kind": "plain",
+              "placeholders": []
             }
           ],
           "active": null,
           "pendingCount": 0,
           "limits": {
-            "skillMaxChars": 27,
+            "skillMaxChars": 48,
             "parts": {
+              "tools": 4000,
               "payload_reference": 4000
             }
           }
@@ -1658,11 +1686,21 @@
           "registry": {
             "path_traversal": {
               "displayName": "Path Traversal",
-              "skillMaxChars": 27,
+              "skillMaxChars": 48,
               "parts": {
+                "tools": {
+                  "text": "Scan with {timeout} s.",
+                  "maxChars": 4000,
+                  "kind": "template",
+                  "placeholders": [
+                    "timeout"
+                  ]
+                },
                 "payload_reference": {
                   "text": "Use ../ sequences.",
-                  "maxChars": 4000
+                  "maxChars": 4000,
+                  "kind": "plain",
+                  "placeholders": []
                 }
               }
             }

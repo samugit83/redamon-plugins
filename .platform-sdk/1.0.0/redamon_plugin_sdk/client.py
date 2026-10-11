@@ -288,7 +288,12 @@ class OverrideApi(_Api):
         self._read: dict = {}
 
     async def get(self, point: str, target_group: str) -> dict:
-        """The factory parts of a target, the version that applies (or None), the limits."""
+        """The factory parts of a target, the version that applies (or None), the limits.
+
+        Each part is `{partId, text, sha256, chars, maxChars, kind, placeholders}`: a
+        `template` part keeps exactly its placeholders and writes a new literal brace doubled;
+        a `plain` part is used verbatim.
+        """
         got = await self._post("override/get", {"point": point, "targetGroup": target_group})
         self._read[(point, target_group)] = _read_hashes(got)
         return got

@@ -114,6 +114,8 @@ def test_release_runs_on_plugin_tags_and_tests_before_it_signs():
     publish = "\n".join(step.get("run", "") for step in signing["steps"])
     assert "sha256sum -c" in publish, "the archive released must be the one built and tested"
     assert "gh release" in publish and "tools/catalog.py add-release" in publish
+    # A re-run checks out a master that may have moved on: the entry must be the tagged version.
+    assert '--expect-version "$VERSION"' in publish
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -149,10 +151,25 @@ def test_revoke_is_by_hand_with_its_inputs_passed_through_env():
         "REASON": "${{ inputs.reason }}",
     }
     script = run_step["run"]
-    assert 'tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason "$REASON"' in script
+    # `=` keeps a reason that starts with a dash from being read as an option.
+    assert 'tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason="$REASON"' in script
     assert 'tools/catalog.py unrevoke "$PLUGIN" "$VERSION"' in script
     commit = next(st for st in job["steps"] if "git commit" in st.get("run", ""))
     assert "${{" not in commit["run"] and "$ACTION" in commit["run"]
+
+
+def test_revoke_checks_its_inputs_before_the_reviewer_is_asked():
+    wf = _load("revoke.yml")
+    # The run's name shows the reviewer what they approve.
+    assert wf["run-name"] == "${{ inputs.action }} ${{ inputs.plugin }} ${{ inputs.version }}"
+    job = _signing_job(wf)
+    check_name = job["needs"]
+    check = wf["jobs"][check_name]
+    assert "environment" not in check and "secrets." not in yaml.safe_dump(check)
+    step = next(st for st in check["steps"] if "tools/catalog.py" in st.get("run", ""))
+    assert step["env"] == {"ACTION": "${{ inputs.action }}", "PLUGIN": "${{ inputs.plugin }}",
+                           "VERSION": "${{ inputs.version }}", "REASON": "${{ inputs.reason }}"}
+    assert "--catalog" in step["run"] and 'revoke "$PLUGIN" "$VERSION" --reason="$REASON"' in step["run"]
 
 
 def test_ci_validates_and_tests_everything_without_secrets():

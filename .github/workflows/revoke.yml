@@ -1,9 +1,11 @@
 # Revokes a published plugin version, or lifts a revocation, by hand only (Actions → Run
 # workflow), after the `release` environment's reviewer approves. A revoked version stays in
 # the catalog and is listed in `revoked` with its reason: every RedAmon stops it at its next
-# reconcile (README.md, "Revoking a version"). The inputs reach the shell only through env, and
-# tools/catalog.py refuses a plugin or version the catalog does not list.
+# reconcile (README.md, "Revoking a version"). The inputs reach the shell only through env;
+# the `check` job tries the change on a copy before the reviewer is asked, so a typo never
+# wastes an approval, and tools/catalog.py refuses a plugin or version the catalog does not list.
 name: Revoke
+run-name: ${{ inputs.action }} ${{ inputs.plugin }} ${{ inputs.version }}
 
 on:
   workflow_dispatch:
@@ -34,8 +36,40 @@ defaults:
     shell: bash
 
 jobs:
+  check:
+    name: Check the inputs against the catalog (before the approval)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - name: Try the change on a copy
+        env:
+          ACTION: ${{ inputs.action }}
+          PLUGIN: ${{ inputs.plugin }}
+          VERSION: ${{ inputs.version }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          cp catalog.json "$RUNNER_TEMP/catalog.json"
+          case "$ACTION" in
+            revoke) python tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason="$REASON" --catalog "$RUNNER_TEMP/catalog.json" ;;
+            unrevoke) python tools/catalog.py unrevoke "$PLUGIN" "$VERSION" --catalog "$RUNNER_TEMP/catalog.json" ;;
+            *) echo "unknown action" >&2; exit 1 ;;
+          esac
+
   revoke:
     name: Change the catalog's revocations and sign it
+    needs: check
     runs-on: ubuntu-24.04
     environment: release
     concurrency:
@@ -65,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$ACTION" in
-            revoke) python tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason "$REASON" ;;
+            revoke) python tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason="$REASON" ;;
             unrevoke) python tools/catalog.py unrevoke "$PLUGIN" "$VERSION" ;;
             *) echo "unknown action" >&2; exit 1 ;;
           esac

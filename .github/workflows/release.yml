@@ -132,7 +132,7 @@ jobs:
           fi
 
       - name: Add the release to the catalog
-        run: python tools/catalog.py add-release "$PLUGIN" --archive "dist/$PLUGIN-$VERSION.tar.gz" --repo "$GITHUB_REPOSITORY"
+        run: python tools/catalog.py add-release "$PLUGIN" --archive "dist/$PLUGIN-$VERSION.tar.gz" --repo "$GITHUB_REPOSITORY" --expect-version "$VERSION"
 
       - name: Sign the catalog
         env:

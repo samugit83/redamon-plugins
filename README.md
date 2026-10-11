@@ -99,8 +99,10 @@ tag, `release.yml` runs two jobs:
    catalog, and commits `catalog.json` and `catalog.json.sig` to `master` as
    `github-actions[bot]` ("chore(catalog): add <plugin> <version>").
 
-Two tags pushed together queue in one concurrency group (`catalog`), so they never race on the
-catalog. Every action in the workflows is pinned to a full commit SHA. The first release,
+Every job that signs (release, revoke, re-sign) runs in one concurrency group (`catalog`), so two
+never race on the catalog. GitHub keeps only one waiting run per group: a third run cancels the
+one still waiting, which shows as "cancelled" and is simply re-run. Every action in the workflows
+is pinned to a full commit SHA. The first release,
 `skiller-v1.0.0`, ran this way on 2026-10-11: build 20 s, then the publish job waited for the
 approval and took 13 s; the raw catalog URL served the new catalog 17 s after the bot's commit.
 
@@ -144,29 +146,36 @@ approval and took 13 s; the raw catalog URL served the new catalog 17 s after th
 - **The publish job fails after the approval**: **Re-run failed jobs** and approve again, within
   7 days (the archive built by the first job is kept 7 days; after that, **Re-run all jobs**). A
   re-run is safe at any step: the archive is byte-identical, an existing GitHub release gets the
-  same file again, and the catalog entry of that version is replaced, not duplicated.
+  same file again, the catalog entry is built from the manifest inside the archive and must be
+  the tagged version (`--expect-version`), however far `master` has moved since, and the entry of
+  that version is replaced, not duplicated.
 
 ### Revoking a version
 
 A patch release fixes a bad version only where an admin clicks **Update**. A revocation stops it
 everywhere: the version stays in the catalog and is listed in `revoked` with a reason, and every
-RedAmon, at its next reconcile (every 5 minutes, plus up to 5 minutes of raw CDN cache), stops
-that plugin's actions and worker, hides its menu items, stops applying the skill versions it
-proposed (the agent uses the built-in text), and shows "Revoked by the catalog: <reason>" on its
-card. The admin's enabled/disabled setting is not touched, and the version is never offered for
-a new install.
+RedAmon stops that plugin's actions and worker, hides its menu items, stops applying the skill
+versions it proposed (the agent uses the built-in text), and shows "Revoked by the catalog:
+<reason>" on its card. That happens at its next reconcile (every 5 minutes) after the raw CDN
+(up to 5 minutes) and RedAmon's 60-second catalog cache have the new catalog: about 11 minutes
+at worst. The admin's enabled/disabled setting is not touched, and the version is never offered
+for a new install. A revoked card offers **Update** when a release that is not revoked exists:
+that is how an admin brings the plugin back.
 
-1. Usually, first publish the fix as the next patch version (above), so admins have something
-   to update to.
+1. Usually, first publish the fix as the next patch version (above), so revoked installations
+   have something to update to.
 2. Actions → **Revoke** → **Run workflow** on `master`: action `revoke`, the plugin id, the
-   released version, and the reason RedAmon will show (500 characters at most).
-3. Approve the `release` deployment, as for a release. The workflow refuses a plugin or version
-   the catalog does not list, an empty reason, and a revocation that changes nothing.
+   released version, and the reason RedAmon will show (500 characters at most; an emoji counts
+   as two).
+3. The `check` job tries the change on a copy first, without the key: a plugin or version the
+   catalog does not list, an empty reason, or a revocation that changes nothing fails there,
+   before anyone is asked. Then approve the `release` deployment, as for a release; the run's
+   name ("revoke <plugin> <version>") says what you approve.
 4. `git pull` to get the bot's `chore(catalog): revoke <plugin> <version>` commit.
 
 A mistaken revocation is lifted the same way with action `unrevoke`; RedAmon serves the version
 again at its next reconcile. Locally, the same change is
-`python tools/catalog.py revoke <plugin> <version> --reason "…"` (or `unrevoke`), but only the
+`python tools/catalog.py revoke <plugin> <version> --reason="…"` (or `unrevoke`), but only the
 workflow can sign it.
 
 ### Re-signing the catalog

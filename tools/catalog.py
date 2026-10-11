@@ -8,7 +8,8 @@
     python tools/catalog.py local <plugin> --archive <tar.gz> (--url URL | --repo OWNER/NAME) --out dist/catalog.json
 
 `add-release` reads `catalog.json` (or starts an empty one) and adds or replaces the plugin's
-release with fields taken from its manifest and the archive. `revoke` lists a released version
+release with fields taken from the archive and the manifest inside it (not the folder, which may
+already be a later version when a release is re-run). `revoke` lists a released version
 in `revoked` with the reason RedAmon shows, which stops that version on every installation;
 `unrevoke` lifts it. `resign` changes nothing but the serial, so the unchanged catalog can be
 signed again (with a new key, after a rotation). Each raises `serial` by one. `local` writes a
@@ -30,6 +31,7 @@ import json
 import pathlib
 import re
 import sys
+import tarfile
 
 import jsonschema
 
@@ -39,7 +41,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = ROOT / "catalog.json"
 # The same id and version shapes as the platform's catalog schema (webapp ids.ts, semver.ts).
 PLUGIN_ID_RE = re.compile(r"[a-z][a-z0-9-]{1,39}")
-REASON_MAX = 500
+# Counted in UTF-16 units, as RedAmon's schema (JavaScript) counts a string: an emoji is two.
+REASON_MAX_UTF16 = 500
 
 
 class CatalogError(Exception):
@@ -90,6 +93,30 @@ def _manifest(plugin: pathlib.Path) -> dict:
     return json.loads((pathlib.Path(plugin) / "plugin.json").read_text(encoding="utf-8"))
 
 
+def _archive_manifest(archive, plugin_id: str) -> dict:
+    """The plugin.json packed in the archive (tools/pack.py puts it at `<id>/plugin.json`)."""
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            member = tar.extractfile(f"{plugin_id}/plugin.json")
+            return json.loads(member.read().decode("utf-8"))
+    except KeyError:
+        raise CatalogError(f"{archive} has no {plugin_id}/plugin.json") from None
+    except (tarfile.TarError, EOFError, OSError) as e:
+        if isinstance(e, FileNotFoundError):
+            raise
+        raise CatalogError(f"{archive} is not a .tar.gz archive made by tools/pack.py") from None
+
+
+def _released_manifest(plugin, archive, expect_version=None) -> dict:
+    plugin_id = _manifest(plugin)["id"]
+    m = _archive_manifest(archive, plugin_id)
+    if m.get("id") != plugin_id:
+        raise CatalogError(f"the archive is {m.get('id')}, not {plugin_id}")
+    if expect_version is not None and m.get("version") != expect_version:
+        raise CatalogError(f"the archive is {m.get('id')} {m.get('version')}, not {expect_version}")
+    return m
+
+
 def release_url(repo: str, plugin_id: str, version: str) -> str:
     return f"https://github.com/{repo}/releases/download/{plugin_id}-v{version}/{plugin_id}-{version}.tar.gz"
 
@@ -126,7 +153,8 @@ def _empty() -> dict:
 
 
 def _ordered(doc: dict, serial: int) -> dict:
-    # Rebuilt key by key, so a field this tool no longer writes (`expires`) is dropped.
+    # Rebuilt key by key, so a field this tool does not write (an older catalog's `expires`)
+    # is dropped.
     return {"catalogVersion": 1, "serial": serial,
             "plugins": doc.get("plugins", []), "revoked": doc.get("revoked", [])}
 
@@ -145,10 +173,10 @@ def _target(doc: dict, plugin_id: str, version: str) -> None:
         raise CatalogError(f"{plugin_id} {version} is not in the catalog: only a released version can be revoked")
 
 
-def add_release(catalog_path, plugin, *, archive, url) -> dict:
+def add_release(catalog_path, plugin, *, archive, url, expect_version=None) -> dict:
     catalog_path = pathlib.Path(catalog_path)
     doc = _read(catalog_path) if catalog_path.exists() else _empty()
-    m = _manifest(plugin)
+    m = _released_manifest(plugin, archive, expect_version)
     doc = _with_release(doc, m, _release(m, archive, url))
     out = _ordered(doc, doc["serial"] + 1)
     _write(catalog_path, out)
@@ -162,8 +190,8 @@ def revoke(catalog_path, plugin_id: str, version: str, *, reason: str) -> dict:
     reason = (reason or "").strip()
     if not reason:
         raise CatalogError("a revocation needs a reason: RedAmon shows it on the plugin's card")
-    if len(reason) > REASON_MAX:
-        raise CatalogError(f"the reason is longer than {REASON_MAX} characters")
+    if len(reason.encode("utf-16-le")) // 2 > REASON_MAX_UTF16:
+        raise CatalogError(f"the reason is longer than {REASON_MAX_UTF16} characters (an emoji counts as two)")
     revoked = [r for r in doc.get("revoked", []) if (r.get("id"), r.get("version")) != (plugin_id, version)]
     if len(revoked) < len(doc.get("revoked", [])):
         old = next(r for r in doc["revoked"] if (r.get("id"), r.get("version")) == (plugin_id, version))
@@ -197,7 +225,7 @@ def resign(catalog_path) -> dict:
 
 def local(out_path, plugin, *, archive, url, now=None, serial=None) -> dict:
     now = _now(now)
-    m = _manifest(plugin)
+    m = _released_manifest(plugin, archive)
     doc = _with_release(_empty(), m, _release(m, archive, url))
     out = _ordered(doc, int(now.timestamp()) if serial is None else int(serial))
     _write(pathlib.Path(out_path), out)
@@ -214,9 +242,6 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Write the plugin catalog.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    def common(p):
-        p.add_argument("--now", default=None, help=argparse.SUPPRESS)
-
     for name in ("add-release", "local"):
         p = sub.add_parser(name)
         p.add_argument("plugin", type=pathlib.Path)
@@ -224,12 +249,13 @@ def main(argv=None) -> int:
         where = p.add_mutually_exclusive_group(required=True)
         where.add_argument("--url")
         where.add_argument("--repo", help="OWNER/NAME: the GitHub release URL is derived from it")
-        common(p)
         if name == "add-release":
             p.add_argument("--catalog", type=pathlib.Path, default=DEFAULT_CATALOG)
+            p.add_argument("--expect-version", default=None, help="refuse an archive of another version")
         else:
             p.add_argument("--out", type=pathlib.Path, default=ROOT / "dist" / "catalog.json")
             p.add_argument("--serial", type=int, default=None)
+            p.add_argument("--now", default=None, help=argparse.SUPPRESS)
     p = sub.add_parser("revoke", help="list a released version in revoked; RedAmon stops it")
     p.add_argument("plugin_id")
     p.add_argument("version")
@@ -255,15 +281,14 @@ def main(argv=None) -> int:
             doc = unrevoke(path, args.plugin_id, args.version)
             what = f"lifted the revocation of {args.plugin_id} {args.version}"
         else:
-            now = _parse_now(args.now)
-            m = _manifest(args.plugin)
+            m = _released_manifest(args.plugin, args.archive, getattr(args, "expect_version", None))
             url = args.url or release_url(args.repo, m["id"], m["version"])
             if args.cmd == "add-release":
                 path = args.catalog
-                doc = add_release(path, args.plugin, archive=args.archive, url=url)
+                doc = add_release(path, args.plugin, archive=args.archive, url=url, expect_version=args.expect_version)
             else:
                 path = args.out
-                doc = local(path, args.plugin, archive=args.archive, url=url, now=now, serial=args.serial)
+                doc = local(path, args.plugin, archive=args.archive, url=url, now=_parse_now(args.now), serial=args.serial)
             what = f"{m['id']} {m['version']}"
     except (CatalogError, OSError, ValueError, KeyError) as e:
         print(f"catalog: {e}", file=sys.stderr)

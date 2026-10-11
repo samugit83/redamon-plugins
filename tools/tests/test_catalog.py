@@ -16,9 +16,20 @@ NOW = dt.datetime(2026, 10, 11, 12, 0, 0, tzinfo=dt.timezone.utc)
 URL = "https://github.com/samugit83/redamon-plugins/releases/download/good-v1.2.0/good-1.2.0.tar.gz"
 
 
-def _archive(tmp_path, content=b"archive bytes"):
-    p = tmp_path / "good-1.2.0.tar.gz"
-    p.write_bytes(content)
+def _archive(tmp_path, content=b"archive bytes", manifest=None):
+    """A real archive of the `good` fixture as it is now: `good/plugin.json` (the folder's
+    manifest, or `manifest`) and one more file whose content varies the bytes."""
+    import io
+    import tarfile
+
+    if manifest is None:
+        manifest = json.loads((tmp_path / "repo" / "good" / "plugin.json").read_text(encoding="utf-8"))
+    p = tmp_path / "good-archive.tar.gz"
+    with tarfile.open(p, "w:gz") as tar:
+        for name, data in (("good/plugin.json", json.dumps(manifest).encode()), ("good/extra.txt", content)):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
     return p
 
 
@@ -51,8 +62,8 @@ def test_add_release_to_a_new_catalog(good_plugin, tmp_path, sdk_dir):
         "platform": ">=1.0.0 <2.0.0",
         "dataVersion": 2,
         "url": URL,
-        "sha256": hashlib.sha256(b"archive bytes").hexdigest(),
-        "size": len(b"archive bytes"),
+        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+        "size": len(archive.read_bytes()),
         "permissions": ["session:read", "llm:invoke", "override:skill.text"],
     }
 
@@ -60,12 +71,13 @@ def test_add_release_to_a_new_catalog(good_plugin, tmp_path, sdk_dir):
 def test_serial_only_grows_and_a_release_is_replaced_not_duplicated(good_plugin, tmp_path):
     out = tmp_path / "catalog.json"
     catalog.add_release(out, good_plugin, archive=_archive(tmp_path, b"one"), url=URL)
-    catalog.add_release(out, good_plugin, archive=_archive(tmp_path, b"two"), url=URL)
+    second = _archive(tmp_path, b"two")
+    catalog.add_release(out, good_plugin, archive=second, url=URL)
     doc = _read(out)
     assert doc["serial"] == 2
     [release] = doc["plugins"][0]["releases"]
     import hashlib
-    assert release["sha256"] == hashlib.sha256(b"two").hexdigest()
+    assert release["sha256"] == hashlib.sha256(second.read_bytes()).hexdigest()
 
 
 def test_releases_of_one_plugin_are_kept_in_version_order(good_plugin, tmp_path):
@@ -94,6 +106,45 @@ def test_other_plugins_and_revocations_are_kept(good_plugin, tmp_path):
     assert [p["id"] for p in doc["plugins"]] == ["echo", "good"]
     assert doc["revoked"] == [{"id": "echo", "version": "0.9.0", "reason": "broken"}]
     assert "expires" not in doc, "the expiry of a catalog signed before 2026-10-11 is dropped"
+
+
+def test_the_release_is_described_by_the_manifest_inside_the_archive(good_plugin, tmp_path):
+    # The publish job checks out master, whose manifest may already be the next version (a
+    # re-run long after the tag): the catalog entry must describe the archive it pins.
+    out = tmp_path / "catalog.json"
+    archive = _archive(tmp_path)
+    m = json.loads((good_plugin / "plugin.json").read_text())
+    m["version"], m["permissions"] = "1.3.0", ["session:read"]
+    (good_plugin / "plugin.json").write_text(json.dumps(m))
+    catalog.add_release(out, good_plugin, archive=archive, url=URL, expect_version="1.2.0")
+    [release] = _read(out)["plugins"][0]["releases"]
+    assert release["version"] == "1.2.0"
+    assert release["permissions"] == ["session:read", "llm:invoke", "override:skill.text"]
+
+
+def test_the_archive_must_be_the_plugin_and_the_version_expected(good_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    with pytest.raises(catalog.CatalogError, match="1.2.0, not 1.2.1"):
+        catalog.add_release(out, good_plugin, archive=_archive(tmp_path), url=URL, expect_version="1.2.1")
+    other = json.loads((good_plugin / "plugin.json").read_text())
+    other["id"] = "other"
+    with pytest.raises(catalog.CatalogError, match="the archive is other, not good"):
+        catalog.add_release(out, good_plugin, archive=_archive(tmp_path, manifest=other), url=URL)
+    import io
+    import tarfile
+    elsewhere = tmp_path / "elsewhere.tar.gz"
+    with tarfile.open(elsewhere, "w:gz") as tar:
+        data = (good_plugin / "plugin.json").read_bytes()
+        info = tarfile.TarInfo("other/plugin.json")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    with pytest.raises(catalog.CatalogError, match="no good/plugin.json"):
+        catalog.add_release(out, good_plugin, archive=elsewhere, url=URL)
+    junk = tmp_path / "junk.tar.gz"
+    junk.write_bytes(b"not an archive")
+    with pytest.raises(catalog.CatalogError, match="not a .tar.gz"):
+        catalog.add_release(out, good_plugin, archive=junk, url=URL)
+    assert not out.exists()
 
 
 def test_an_invalid_result_is_refused_and_nothing_is_written(good_plugin, tmp_path):
@@ -152,7 +203,7 @@ def test_cli_add_release_by_repository(good_plugin, tmp_path, capsys):
     out = tmp_path / "catalog.json"
     archive = _archive(tmp_path)
     code = catalog.main(["add-release", str(good_plugin), "--archive", str(archive), "--repo", "samugit83/redamon-plugins",
-                         "--catalog", str(out), "--now", "2026-10-11T12:00:00Z"])
+                         "--catalog", str(out)])
     assert code == 0
     assert _read(out)["plugins"][0]["releases"][0]["url"] == URL
     printed = capsys.readouterr().out
@@ -204,13 +255,30 @@ def test_revoke_refuses_what_the_catalog_does_not_list(good_plugin, tmp_path, pl
     assert out.read_bytes() == before
 
 
-@pytest.mark.parametrize("reason, match", [("", "a reason"), ("   ", "a reason"), ("x" * 501, "500 characters")])
+# RedAmon's schema counts a reason in UTF-16 units (JavaScript strings), so an emoji counts
+# twice: 251 of them are 502 units, over the limit although Python counts 251.
+@pytest.mark.parametrize("reason, match", [("", "a reason"), ("   ", "a reason"), ("x" * 501, "500 characters"),
+                                           ("\U0001F600" * 251, "500 characters"),
+                                           ("x" * 400 + "\U0001F600" * 60, "500 characters")])
 def test_revoke_needs_a_short_reason(good_plugin, tmp_path, reason, match):
     out = _released(good_plugin, tmp_path, "1.2.0")
     before = out.read_bytes()
     with pytest.raises(catalog.CatalogError, match=match):
         catalog.revoke(out, "good", "1.2.0", reason=reason)
     assert out.read_bytes() == before
+
+
+def test_a_reason_of_exactly_500_utf16_units_is_accepted(good_plugin, tmp_path):
+    out = _released(good_plugin, tmp_path, "1.2.0")
+    reason = "x" * 498 + "\U0001F600"
+    catalog.revoke(out, "good", "1.2.0", reason=reason)
+    assert _read(out)["revoked"][0]["reason"] == reason
+
+
+def test_a_reason_may_start_with_a_dash_on_the_command_line(good_plugin, tmp_path, capsys):
+    out = _released(good_plugin, tmp_path, "1.2.0")
+    assert catalog.main(["revoke", "good", "1.2.0", "--reason=-broken", "--catalog", str(out)]) == 0
+    assert _read(out)["revoked"][0]["reason"] == "-broken"
 
 
 def test_revoking_again_changes_the_reason_or_refuses_a_no_op(good_plugin, tmp_path):

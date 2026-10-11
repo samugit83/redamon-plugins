@@ -119,6 +119,26 @@ def test_leaks_are_found_in_added_text_note_and_meta():
     assert run_eval.template_problems(broken)
 
 
+
+def test_a_leak_is_a_whole_identifier_not_part_of_a_word():
+    # The planted parameter `lang` must count where the text names it, but not inside
+    # "language": the same boundaries as Skiller's own Identifiers.find (found by the first
+    # real-model run, 2026-10-11, where the substring match could not tell them apart).
+    spec = SESSIONS["xss"]
+    assert "lang" in spec["plantedIdentifiers"]
+
+    def leaked(text):
+        review = json.loads(json.dumps(REVIEW))
+        review["parts"][0]["after"] += text + "\n"
+        return "lang" in run_eval.leaks(spec, review)
+
+    for clean in ("Check the page language before encoding.", "Use slang-free payload names.",
+                  "A lang-specific filter", "langs are not relevant"):
+        assert not leaked(clean), clean
+    for leaky in ("Inject into the lang parameter.", "Try ?lang=<payload> first.", "the `lang` value",
+                  "Probe LANG and q together.", "params: q, lang."):
+        assert leaked(leaky), leaky
+
 class _FakeRedAmon(http.server.BaseHTTPRequestHandler):
     calls: list = []
     job_polls = 0

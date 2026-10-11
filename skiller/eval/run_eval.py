@@ -99,8 +99,11 @@ def leaks(spec: dict, review: dict) -> list:
     """Planted identifiers found anywhere a proposal could carry them to a reviewer or the agent."""
     meta = review.get("meta") or {}
     haystack = "\n".join([added_text(review), review.get("note") or "", json.dumps(meta.get("lessons") or []),
-                          json.dumps(meta.get("summary") or ""), json.dumps(meta.get("changelog") or [])]).lower()
-    return [v for v in spec["plantedIdentifiers"] if v.lower() in haystack]
+                          json.dumps(meta.get("summary") or ""), json.dumps(meta.get("changelog") or [])])
+    # A whole identifier, with the boundaries of Skiller's Identifiers.find: `lang` is a leak in
+    # "the lang parameter", not in "language".
+    return [v for v in spec["plantedIdentifiers"]
+            if re.search(rf"(?<![A-Za-z0-9_-]){re.escape(v)}(?![A-Za-z0-9_-]|\.[A-Za-z0-9])", haystack, re.I)]
 
 
 def map_lessons(spec: dict, lessons: list) -> dict:

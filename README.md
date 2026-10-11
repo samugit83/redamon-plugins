@@ -18,7 +18,7 @@ README.md  LICENSE  .gitignore
 .github/workflows/            ci.yml, release.yml, catalog-refresh.yml
 .platform-sdk/<version>/      synced copy of the platform contract, one folder per platform version
 tools/                        validate, pack, catalog, sign, gen_key, semver, sync_sdk, run_tests
-catalog.json, catalog.json.sig   written by the release workflow only (absent until the first release)
+catalog.json, catalog.json.sig   written only by the release and refresh workflows, never by hand
 <plugin>/                     one folder per plugin
 ```
 
@@ -89,33 +89,100 @@ they need no network, no RedAmon and no model.
 
 A release is a tag `<pluginId>-v<version>`, for example `skiller-v1.0.0`. The tag must point at a
 commit where `<plugin>/plugin.json` has that version and `CHANGELOG.md` has its section. For the
-tag, `release.yml`:
+tag, `release.yml` runs two jobs:
 
-1. validates the plugin and runs its tests on the lowest synced platform version its range accepts;
-2. packs only that folder and computes its sha256;
-3. creates the GitHub release with the archive;
-4. in the protected environment `release` (a reviewer approves): adds the release to
-   `catalog.json`, increments `serial`, sets `expires` to 90 days, signs it, and commits
-   `catalog.json` and `catalog.json.sig` to `master`.
+1. **build** (no secret): checks that the tag matches the manifest, validates the plugin, runs its
+   tests on the lowest synced platform version its range accepts, and packs only that folder
+   (deterministic archive, sha256);
+2. **publish**, in the protected environment `release`, **after a reviewer approves**: creates the
+   GitHub release with the archive, adds it to `catalog.json`, increments `serial`, sets `expires`
+   to 90 days, signs the catalog, and commits `catalog.json` and `catalog.json.sig` to `master` as
+   `github-actions[bot]` ("chore(catalog): add <plugin> <version>").
 
 Two tags pushed together queue in one concurrency group (`catalog`), so they never race on the
-catalog. `catalog-refresh.yml` re-signs the unchanged catalog monthly (and by hand) with a new
-expiry and `serial` + 1, after the same approval; left unapproved, the catalog expires: installed
-plugins keep running, but installs and updates stop until a fresh catalog is signed. RedAmon warns
-14 days before.
+catalog. Every action in the workflows is pinned to a full commit SHA. The first release,
+`skiller-v1.0.0`, ran this way on 2026-10-11: build 20 s, then the publish job waited for the
+approval and took 13 s; the raw catalog URL served the new catalog 17 s after the bot's commit.
 
-Every action in the workflows is pinned to a full commit SHA.
+### Releasing a new version of a plugin
+
+1. `git pull` first: the release bot commits the catalog to `master`, so your copy is behind
+   after every release.
+2. Make the change, with tests.
+3. Raise `version` in `<plugin>/plugin.json`: patch `x.y.Z` for a fix, minor `x.Y.0` for a
+   feature, major `X.0.0` for a change that breaks what users or stored data rely on.
+4. Add `## [x.y.z]` to `<plugin>/CHANGELOG.md`.
+5. Only if the shape of the plugin's stored data changes: raise `dataVersion` and add
+   `migrations/NNNN_up.py` and `NNNN_down.py`.
+6. Only if the plugin needs a newer platform feature: `tools/sync_sdk.sh <path-to-redamon>
+   <git-ref>` and raise the lower bound of `platform`. Installations on an older RedAmon keep the
+   previous release, because RedAmon installs the newest release its platform version accepts.
+7. `tools/run_tests.sh <plugin>` and `tools/validate.py <plugin>` (in the container, see "Tests").
+8. Commit and push `master`; wait for the CI run to be green.
+9. Tag that commit and push the tag:
+   `git tag <plugin>-v<x.y.z> && git push origin <plugin>-v<x.y.z>`.
+   Only a repository admin can create `*-v*` tags (ruleset `release tags`; GitHub reports
+   "Bypassed rule violations" for the admin, which is expected).
+10. Approve: GitHub e-mails the reviewer; open Actions → the "Release" run → **Review
+    deployments** → tick `release` → **Approve and deploy**.
+11. `git pull` to get the bot's `chore(catalog): add …` commit.
+12. RedAmon installations see the new release within about six minutes (the raw CDN caches the
+    catalog for up to 5 minutes, RedAmon for 60 s); an admin clicks **Update** on the plugin's
+    card. Nothing updates by itself.
+
+### Rules, and what to do when a release fails
+
+- A version number is used once. Never move or delete a published tag or GitHub release: the
+  catalog pins the archive's sha256, and installations may already hold it. A broken release is
+  fixed by the next patch version.
+- **The build job fails** (tests, validation, tag and manifest disagree): nothing is published.
+  A transient failure (a runner or network outage) is retried with Actions → the run → **Re-run
+  failed jobs**, which rebuilds the same commit. A real failure is fixed on `master` and released
+  as the next patch version; the failed tag stays and is never reused.
+- **The approval is rejected or not given** (a waiting job expires after 30 days): nothing is
+  published. To publish that tag later, **Re-run all jobs** and approve.
+- **The publish job fails after the approval**: **Re-run failed jobs** and approve again, within
+  7 days (the archive built by the first job is kept 7 days; after that, **Re-run all jobs**). A
+  re-run is safe at any step: the archive is byte-identical, an existing GitHub release gets the
+  same file again, and the catalog entry of that version is replaced, not duplicated.
+- **Revoking a published version** (listing it in the catalog's `revoked`, which disables it on
+  every installation) has no command or workflow yet: `catalog.py` cannot add an entry to
+  `revoked`, and only the `release` environment can sign. Until one exists, release the next patch
+  version.
+
+### The monthly catalog refresh
+
+`catalog-refresh.yml` runs on the 1st of each month at 06:17 UTC (and by hand from Actions): it
+re-signs the unchanged catalog with `expires` = 90 days and `serial` + 1. It needs the same
+approval as a release, so the reviewer gets an e-mail every month; approving it is the one routine
+chore. Every release also resets the expiry. Left unapproved for about two months, the catalog
+expires: installed plugins keep running, but installs and updates stop until a fresh catalog is
+signed. RedAmon's Plugins page warns 14 days before.
+
+### Repository settings
+
+These are set in the GitHub UI by the owner; the token used for pushes cannot change them.
+
+| Setting | Value |
+|---|---|
+| Visibility | public (installations download release assets without credentials) |
+| Environment `release` | required reviewer: the owner; deployment branches and tags: `master` and `*-v*`; secrets `CATALOG_SIGNING_KEY` (PEM) and `CATALOG_SIGNING_KEY_ID` |
+| Ruleset `release tags` | `refs/tags/*-v*`: creation, update, deletion and force push restricted; bypass: Repository admin |
+| Ruleset `protect master` | default branch: deletion and force push restricted. It must not require pull requests, status checks or signed commits, or restrict updates: the release bot pushes the catalog to `master` directly |
+| Actions → Workflow permissions | read-only (the default); each job declares its own, and only the catalog-committing jobs ask for `contents: write` |
 
 ## Keys
 
 | Key | Where |
 |---|---|
 | Production private key | only the `CATALOG_SIGNING_KEY` secret (with `CATALOG_SIGNING_KEY_ID`) of the `release` environment, plus the owner's offline backup |
-| Production public key | RedAmon's keyring (`webapp/src/lib/plugins/keyring.ts`), shipped in a RedAmon release |
+| Production public key | id `ee4a2df9065d36b1`, in RedAmon's keyring (`webapp/src/lib/plugins/keyring.ts`), shipped in a RedAmon release |
 | Development keys | made by `tools/gen_key.py` outside every repository; trusted by a local RedAmon only through `PLUGINS_EXTRA_TRUSTED_KEYS` |
 
 No private key is ever in this repository: `.gitignore` refuses `*.pem`, `*.key` and `.env*`, and
-a test fails if key material appears in any file.
+a test fails if key material appears in any file. Rotating the production key starts with a
+RedAmon release that trusts the new key; the steps are in RedAmon's
+`docs/readmes/README.PLUGINS.md` §6.4.
 
 ## Developing a plugin against a local RedAmon
 
@@ -141,15 +208,25 @@ remove it when you are done. (Run these commands in `python:3.11-slim` too, for 
 
 ## Adding a plugin
 
-1. Create `<plugin>/` with the layout above; the id matches `^[a-z][a-z0-9-]{1,39}$`.
+1. `git pull`, then create `<plugin>/` with the layout above; the id matches
+   `^[a-z][a-z0-9-]{1,39}$` and is never reused for another plugin.
 2. Write `plugin.json` (the manifest is described in RedAmon's `docs/readmes/README.PLUGINS.md`
-   §6.3, and its schema is `.platform-sdk/<version>/schemas/manifest.schema.json`), ask for the
-   fewest permissions that work, and write the README: what it reads, what it stores,
-   what a person must approve.
+   §6.3, and its schema is `.platform-sdk/<version>/schemas/manifest.schema.json`), starting at
+   version `1.0.0` and `dataVersion` 1. Ask for the fewest permissions that work, and write the
+   README: what it reads, what it stores, what a person must approve. Add `CHANGELOG.md` with
+   `## [1.0.0]`.
 3. Write tests with `FakeSdk` and `ScriptedLlm`; `tools/run_tests.sh <plugin>` and
    `tools/validate.py <plugin>` must pass.
-4. Add the folder to `.github/CODEOWNERS`.
-5. Merge to `master`, then push the tag `<plugin>-v<version>`.
+4. Add the line `/<plugin>/ @samugit83` to `.github/CODEOWNERS`, and a row to the table at the
+   top of this README.
+5. Optional, recommended: try it on a local RedAmon with a development key ("Developing a plugin
+   against a local RedAmon" above).
+6. Push `master`, then follow "Releasing a new version of a plugin" from step 8: tag
+   `<plugin>-v1.0.0`, approve, pull. The plugin appears on every installation's Plugins page as
+   a new card.
+
+No RedAmon release is needed for a new plugin, unless it needs a platform feature RedAmon does
+not have yet, or the signing key changes.
 
 ## Licence
 

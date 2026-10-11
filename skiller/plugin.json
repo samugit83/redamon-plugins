@@ -1,0 +1,25 @@
+{
+  "id": "skiller",
+  "version": "1.0.0",
+  "displayName": "Skiller",
+  "description": "Learns from an agent chat session and proposes a better, session-agnostic version of the built-in skill it used. Nothing changes until a person approves it.",
+  "platform": ">=1.0.0 <2.0.0",
+  "dataVersion": 1,
+  "permissions": ["session:read", "llm:invoke", "override:skill.text"],
+  "llmFeature": { "description": "Reads a chat session and writes the improved skill text." },
+  "actions": [
+    {
+      "id": "analyze_session",
+      "entry": "engine/main.py:analyze_session",
+      "timeoutSeconds": 600,
+      "async": true,
+      "llm": true
+    }
+  ],
+  "contributes": {
+    "chat.session.actions": [
+      { "label": "Improve skill from this session", "icon": "sparkles", "action": "analyze_session" },
+      { "label": "Skill versions", "icon": "history", "coreScreen": "skill.text.versions" }
+    ]
+  }
+}

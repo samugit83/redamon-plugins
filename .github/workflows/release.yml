@@ -1,0 +1,152 @@
+# A tag <pluginId>-v<version> releases that plugin (README.md, "Releases"):
+#   build    validate, test on the lowest synced platform its range accepts, pack (no secret)
+#   publish  in the protected environment `release` (a reviewer approves): the GitHub release,
+#            the catalog entry, serial + 1, the signature, committed to main
+# Two tags pushed together queue in the `catalog` group, so they never race on the catalog.
+name: Release
+
+on:
+  push:
+    tags: ["*-v*"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Validate, test and pack
+    runs-on: ubuntu-24.04
+    container: python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+    env:
+      REDAMON_PLUGINS_IN_CONTAINER: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      TAG: ${{ github.ref_name }}
+    outputs:
+      plugin: ${{ steps.tag.outputs.plugin }}
+      version: ${{ steps.tag.outputs.version }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - name: Read the tag (it must match the plugin's manifest)
+        id: tag
+        run: |
+          set -euo pipefail
+          python - "$TAG" >> "$GITHUB_OUTPUT" <<'PY'
+          import json, re, sys
+          tag = sys.argv[1]
+          m = re.fullmatch(r"([a-z][a-z0-9-]{1,39})-v((?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8}))", tag)
+          if not m:
+              sys.exit(f"{tag!r} is not a release tag <pluginId>-v<x.y.z>")
+          plugin, version = m.groups()
+          manifest = json.load(open(f"{plugin}/plugin.json", encoding="utf-8"))
+          if (manifest.get("id"), manifest.get("version")) != (plugin, version):
+              sys.exit(f"{plugin}/plugin.json is {manifest.get('id')} {manifest.get('version')}; the tag says {plugin} {version}")
+          print(f"plugin={plugin}")
+          print(f"version={version}")
+          PY
+
+      - name: Validate
+        env:
+          PLUGIN: ${{ steps.tag.outputs.plugin }}
+        run: python tools/validate.py "$PLUGIN"
+
+      - name: Test on the lowest synced platform the range accepts
+        env:
+          PLUGIN: ${{ steps.tag.outputs.plugin }}
+        run: bash tools/run_tests.sh "$PLUGIN"
+
+      - name: Pack
+        id: pack
+        env:
+          PLUGIN: ${{ steps.tag.outputs.plugin }}
+        run: |
+          set -euo pipefail
+          python tools/pack.py "$PLUGIN" --out-dir dist | tee pack.json
+          echo "sha256=$(python -c 'import json; print(json.load(open("pack.json"))["sha256"])')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the release and sign the catalog
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    concurrency:
+      group: catalog
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      PLUGIN: ${{ needs.build.outputs.plugin }}
+      VERSION: ${{ needs.build.outputs.version }}
+      SHA256: ${{ needs.build.outputs.sha256 }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: archive
+          path: dist
+
+      - name: Check the archive is the one built and tested
+        run: echo "$SHA256  dist/$PLUGIN-$VERSION.tar.gz" | sha256sum -c -
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="dist/$PLUGIN-$VERSION.tar.gz"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-run after a later step failed: the archive is deterministic, so this is the same file.
+            gh release upload "$TAG" "$archive" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$archive" --verify-tag --repo "$GITHUB_REPOSITORY" \
+              --title "$PLUGIN $VERSION" --notes "See $PLUGIN/CHANGELOG.md. sha256: $SHA256"
+          fi
+
+      - name: Add the release to the catalog
+        run: python tools/catalog.py add-release "$PLUGIN" --archive "dist/$PLUGIN-$VERSION.tar.gz" --repo "$GITHUB_REPOSITORY"
+
+      - name: Sign the catalog
+        env:
+          CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
+          CATALOG_SIGNING_KEY_ID: ${{ secrets.CATALOG_SIGNING_KEY_ID }}
+        run: python tools/sign.py catalog.json
+
+      - name: Commit the catalog to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json catalog.json.sig
+          git commit -m "chore(catalog): add $PLUGIN $VERSION"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

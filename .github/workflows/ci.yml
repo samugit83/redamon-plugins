@@ -1,0 +1,54 @@
+# Every push to main and every pull request: validate, test and pack every plugin, and test
+# the tools. No secret is available here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Validate, test and pack
+    runs-on: ubuntu-24.04
+    container: python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+    env:
+      REDAMON_PLUGINS_IN_CONTAINER: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - name: Validate every plugin
+        run: |
+          set -euo pipefail
+          for d in */; do
+            [[ -f "$d/plugin.json" ]] || continue
+            python tools/validate.py "${d%/}"
+          done
+
+      - name: Test the tools and every plugin
+        run: bash tools/run_tests.sh all
+
+      - name: Pack every plugin twice (the archives must be byte-identical)
+        run: |
+          set -euo pipefail
+          sha() { python -c 'import json, sys; print(json.load(sys.stdin)["sha256"])'; }
+          for d in */; do
+            [[ -f "$d/plugin.json" ]] || continue
+            a="$(python tools/pack.py "${d%/}" --out-dir /tmp/pack-a | sha)"
+            b="$(python tools/pack.py "${d%/}" --out-dir /tmp/pack-b | sha)"
+            [[ "$a" == "$b" ]] || { echo "${d%/}: two packs of the same commit differ"; exit 1; }
+            echo "${d%/}: $a"
+          done

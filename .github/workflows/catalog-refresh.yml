@@ -1,0 +1,71 @@
+# Re-signs the unchanged catalog with a new expiry (90 days) and serial + 1, monthly and by
+# hand, after the `release` environment's reviewer approves. Left unapproved, the catalog
+# expires: installed plugins keep running, installs and updates stop until a fresh one is
+# signed (RedAmon warns 14 days before).
+name: Catalog refresh
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  refresh:
+    name: Re-sign the catalog with a new expiry
+    runs-on: ubuntu-24.04
+    environment: release
+    concurrency:
+      group: catalog
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - name: Refresh the expiry and the serial
+        id: refresh
+        run: |
+          set -euo pipefail
+          if [[ ! -f catalog.json ]]; then
+            echo "No catalog yet (no release so far): nothing to refresh."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python tools/catalog.py refresh
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sign the catalog
+        if: steps.refresh.outputs.present == 'true'
+        env:
+          CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
+          CATALOG_SIGNING_KEY_ID: ${{ secrets.CATALOG_SIGNING_KEY_ID }}
+        run: python tools/sign.py catalog.json
+
+      - name: Commit the catalog to main
+        if: steps.refresh.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json catalog.json.sig
+          git commit -m "chore(catalog): refresh the expiry and the signature"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

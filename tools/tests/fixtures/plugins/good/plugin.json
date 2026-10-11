@@ -1,0 +1,23 @@
+{
+  "id": "good",
+  "version": "1.2.0",
+  "displayName": "Good",
+  "description": "A plugin that passes every check of tools/validate.py.",
+  "platform": ">=1.0.0 <2.0.0",
+  "dataVersion": 2,
+  "permissions": ["session:read", "llm:invoke", "override:skill.text"],
+  "llmFeature": { "description": "Summarises a session." },
+  "actions": [
+    { "id": "run", "entry": "engine/main.py:run", "timeoutSeconds": 60, "async": true, "llm": true },
+    { "id": "list_items", "entry": "engine/main.py:list_items", "timeoutSeconds": 30 }
+  ],
+  "contributes": {
+    "nav": { "label": "Good", "icon": "puzzle", "screen": "ui/home.json" },
+    "chat.session.actions": [
+      { "label": "Run good", "icon": "sparkles", "action": "run" },
+      { "label": "Skill versions", "icon": "history", "coreScreen": "skill.text.versions" }
+    ],
+    "project.skills.row": [ { "label": "Run on this skill", "action": "run" } ]
+  },
+  "screens": ["ui/home.json", "ui/detail.json"]
+}

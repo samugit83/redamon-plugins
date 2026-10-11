@@ -25,3 +25,18 @@ def sdk_dir() -> pathlib.Path:
 @pytest.fixture
 def semver_cases(sdk_dir) -> list:
     return json.loads((sdk_dir / "semver-cases.json").read_text(encoding="utf-8"))
+
+# The fixture plugins carry their own tests/ folders; they are data here, not tests to run.
+collect_ignore_glob = ["fixtures/*"]
+
+
+@pytest.fixture
+def good_plugin(tmp_path) -> pathlib.Path:
+    """A fresh copy of the valid fixture plugin inside a throwaway repository root."""
+    import shutil
+
+    from support import FIXTURES
+
+    dest = tmp_path / "repo" / "good"
+    shutil.copytree(FIXTURES / "plugins" / "good", dest)
+    return dest

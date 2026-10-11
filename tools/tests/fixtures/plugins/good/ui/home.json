@@ -1,0 +1,14 @@
+{
+  "type": "page",
+  "title": "Good",
+  "children": [
+    { "type": "markdown", "content": { "text": "Items" } },
+    {
+      "type": "list",
+      "source": { "action": "list_items" },
+      "itemTitle": "name",
+      "rowActions": [ { "label": "Open", "screen": "ui/detail.json", "pass": ["name"] } ]
+    },
+    { "type": "button", "label": "Run", "action": "run" }
+  ]
+}

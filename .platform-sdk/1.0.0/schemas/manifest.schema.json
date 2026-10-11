@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "allOf": [
+        {
+          "pattern": "^[a-z][a-z0-9-]{1,39}(?!\\n)$"
+        },
+        {
+          "pattern": "^(?!(?:staging|platform|core|redamon|plugins|admin|api|system|internal|status|llm-features|jobs|offline-install|contributions|overrides|external-link)(?!\\n)$)"
+        }
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(?!\\n)$"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "platform": {
+      "type": "string",
+      "pattern": "^ *(>=|<=|>|<|=)(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})( +(>=|<=|>|<|=)(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})){0,3} *(?!\\n)$"
+    },
+    "dataVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "session:read",
+          "llm:invoke",
+          "override:skill.text"
+        ]
+      }
+    },
+    "llmFeature": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "actions": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,39}(?!\\n)$"
+          },
+          "entry": {
+            "type": "string",
+            "pattern": "^engine(\\/[a-z0-9_]+)+\\.py:[a-z_][a-z0-9_]*(?!\\n)$"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600
+          },
+          "async": {
+            "type": "boolean"
+          },
+          "llm": {
+            "type": "boolean"
+          },
+          "resultScreen": {
+            "type": "string",
+            "pattern": "^ui(\\/[a-z0-9_-]+)+\\.json(?!\\n)$"
+          }
+        },
+        "required": [
+          "id",
+          "entry",
+          "timeoutSeconds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "properties": {
+        "nav": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "icon": {
+              "type": "string",
+              "enum": [
+                "puzzle",
+                "sparkles",
+                "history",
+                "list",
+                "file-text",
+                "settings",
+                "play",
+                "search",
+                "shield",
+                "book-open",
+                "bot",
+                "bug",
+                "clock",
+                "database",
+                "star",
+                "target",
+                "zap"
+              ]
+            },
+            "screen": {
+              "type": "string",
+              "pattern": "^ui(\\/[a-z0-9_-]+)+\\.json(?!\\n)$"
+            }
+          },
+          "required": [
+            "label",
+            "icon",
+            "screen"
+          ],
+          "additionalProperties": false
+        },
+        "chat.session.actions": {
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "icon": {
+                "type": "string",
+                "enum": [
+                  "puzzle",
+                  "sparkles",
+                  "history",
+                  "list",
+                  "file-text",
+                  "settings",
+                  "play",
+                  "search",
+                  "shield",
+                  "book-open",
+                  "bot",
+                  "bug",
+                  "clock",
+                  "database",
+                  "star",
+                  "target",
+                  "zap"
+                ]
+              },
+              "action": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{1,39}(?!\\n)$"
+              },
+              "coreScreen": {
+                "type": "string",
+                "enum": [
+                  "skill.text.versions"
+                ]
+              }
+            },
+            "required": [
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "project.skills.row": {
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "action": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{1,39}(?!\\n)$"
+              }
+            },
+            "required": [
+              "label",
+              "action"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "screens": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ui(\\/[a-z0-9_-]+)+\\.json(?!\\n)$"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "displayName",
+    "description",
+    "platform",
+    "dataVersion",
+    "permissions",
+    "actions"
+  ],
+  "additionalProperties": false,
+  "title": "RedAmon plugin manifest (plugin.json)",
+  "description": "Generated from webapp/src/lib/plugins/schemas/manifest.ts for platform 1.0.0. Do not edit by hand."
+}

@@ -1,0 +1,8 @@
+# One key signs every plugin, so every plugin folder and everything that builds or signs a
+# release needs the owner's review (README.md, "Releases").
+/skiller/ @samugit83
+/tools/ @samugit83
+/.github/ @samugit83
+/.platform-sdk/ @samugit83
+/catalog.json @samugit83
+/catalog.json.sig @samugit83

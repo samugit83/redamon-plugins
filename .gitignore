@@ -1,0 +1,9 @@
+# Build output: archives and local catalogs are produced by tools/pack.py and tools/catalog.py.
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Keys never enter this repository (README.md, "Keys"): gen_key.py writes them elsewhere.
+*.pem
+*.key
+.env*

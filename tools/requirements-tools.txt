@@ -1,0 +1,19 @@
+# Everything the tools and the tests need, as the exact set pip resolved in python:3.11-slim.
+# Installed with `pip install --no-deps -r`, so nothing else enters the environment.
+# Plugin code never imports these: workers see only the standard library, the SDK and the
+# plugin's own vendor/ folder.
+attrs==26.1.0
+cffi==2.1.1
+cryptography==45.0.7
+iniconfig==2.3.1
+jsonschema==4.25.1
+jsonschema-specifications==2025.9.1
+packaging==26.2
+pluggy==1.6.0
+pycparser==3.11
+Pygments==2.21.0
+pytest==8.4.2
+PyYAML==6.0.2
+referencing==0.37.0
+rpds-py==2026.9.1
+typing_extensions==4.16.0

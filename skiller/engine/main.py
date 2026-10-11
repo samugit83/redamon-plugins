@@ -110,8 +110,14 @@ def _settle(skill: _Skill, edit_list: list, *, ids, tool_set: set) -> tuple:
         dropped += len(problems)
 
 
-def _no_improvement(skill_id: str, message: str) -> dict:
-    return {"status": "no_improvement", "skillId": skill_id, "message": message}
+def _no_improvement(skill_id: str, message: str, stats: dict) -> dict:
+    return {"status": "no_improvement", "skillId": skill_id, "message": message, "stats": stats}
+
+
+def _stats(calls: dict, *, lessons=0, dropped_lessons=0, edits_kept=0, dropped_edits=0, repaired=0) -> dict:
+    """Counts only, for the job view and the evaluation (no text from the session or the model)."""
+    return {"modelCalls": dict(calls), "lessons": lessons, "droppedLessons": dropped_lessons, "edits": edits_kept,
+            "droppedEdits": dropped_edits, "repaired": repaired}
 
 
 async def analyze_session(ctx, params):
@@ -154,17 +160,19 @@ async def analyze_session(ctx, params):
                            llm_json.check_diagnosis, max_tokens=A_MAX_TOKENS, temperature=TEMPERATURE)
     diagnosis = a["value"]
     model_used = a["model"]
+    calls = {"diagnose": a["attempts"], "edit": 0, "repair": 0}
     if diagnosis["skill_fit"] == "poor":
         return _no_improvement(skill_id, f"This session did not fit the {name} skill, so it is not a good basis "
-                                         "for improving it.")
+                                         "for improving it.", _stats(calls))
     lessons = [lesson for lesson in diagnosis["lessons"] if guard.lesson_ok(lesson["lesson"], ids)]
     dropped_lessons = len(diagnosis["lessons"]) - len(lessons)
     if not lessons:
+        stats = _stats(calls, dropped_lessons=dropped_lessons)
         if dropped_lessons:
             return _no_improvement(skill_id, f"The lessons from this session were specific to its target, so none "
-                                             f"could improve the {name} skill.")
+                                             f"could improve the {name} skill.", stats)
         reason = guard.redact(diagnosis["no_change_reason"], ids) or "no general lesson came out of this session"
-        return _no_improvement(skill_id, f"Skiller has no improvement for {name}: {reason}")
+        return _no_improvement(skill_id, f"Skiller has no improvement for {name}: {reason}", stats)
 
     # 8-9. Stage B: anchored edits.
     await sdk.jobs.progress("Writing the new version", {**shown, "Stage": "2 of 3"})
@@ -174,11 +182,13 @@ async def analyze_session(ctx, params):
     messages_b = prompts.messages_b(tool_list=tool_list, max_added_chars=EDIT_PROMPT_ADDED_CHARS, skill_id=skill_id,
                                     name=name, version_label=version_label, lessons=lessons, parts=skill.views())
     b = await llm_json.ask(sdk, messages_b, llm_json.check_edits, max_tokens=B_MAX_TOKENS, temperature=TEMPERATURE)
+    calls["edit"] = b["attempts"]
     first_edits = b["value"]["edits"]
     summary, changelog = b["value"]["summary"], b["value"]["changelog"]
     if not first_edits:
         reason = guard.redact(summary, ids) or "the model proposed no change"
-        return _no_improvement(skill_id, f"Skiller has no improvement for {name}: {reason}")
+        return _no_improvement(skill_id, f"Skiller has no improvement for {name}: {reason}",
+                               _stats(calls, lessons=len(lessons), dropped_lessons=dropped_lessons))
 
     # 10-13. Apply, check, one repair round, then drop what still fails.
     _, problems, risky = _evaluate(skill, first_edits, ids=ids, tool_set=tool_set)
@@ -188,15 +198,19 @@ async def analyze_session(ctx, params):
         lines = [p for i in sorted(problems) for p in problems[i]]
         repair = messages_b + [{"role": "assistant", "content": b["raw"]},
                                {"role": "user", "content": prompts.repair_message(lines)}]
-        fixed = (await llm_json.ask(sdk, repair, llm_json.check_edits, max_tokens=B_MAX_TOKENS,
-                                    temperature=TEMPERATURE))["value"]["edits"]
+        repaired_answer = await llm_json.ask(sdk, repair, llm_json.check_edits, max_tokens=B_MAX_TOKENS,
+                                             temperature=TEMPERATURE)
+        calls["repair"] = repaired_answer["attempts"]
+        fixed = repaired_answer["value"]["edits"]
         final_edits = [e for i, e in enumerate(first_edits, 1) if i not in problems] + fixed
     result, kept, dropped_edits, more_risky = _settle(skill, final_edits, ids=ids, tool_set=tool_set)
     repaired = sum(1 for e in kept if any(e is f for f in fixed))
+    stats = _stats(calls, lessons=len(lessons), dropped_lessons=dropped_lessons, edits_kept=len(kept),
+                   dropped_edits=dropped_edits, repaired=repaired)
     edited = {pid: text for pid, text in result.parts.items() if text != skill.current[pid]}
     if not edited or proposal.unchanged(skill.current, edited):
         return _no_improvement(skill_id, f"Skiller has no improvement for {name}: none of the proposed edits passed "
-                                         "its checks.")
+                                         "its checks.", stats)
 
     # 14-15. The snapshot, saved as a proposal.
     await sdk.jobs.progress("Saving the proposal", {**shown, "Stage": "3 of 3"})
@@ -236,4 +250,4 @@ async def analyze_session(ctx, params):
     label = out.get("proposedRevisionLabel") or f"v{skill.from_revision + 1}"
     return {"status": "proposed", "skillId": skill_id,
             "reviewProposal": {"extensionPoint": POINT, "changeSetId": out["changeSetId"]},
-            "message": f"Skiller proposes {label} of {name}."}
+            "message": f"Skiller proposes {label} of {name}.", "stats": stats}

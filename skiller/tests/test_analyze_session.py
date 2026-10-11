@@ -67,7 +67,9 @@ def test_proposes_a_snapshot_and_points_the_review_at_it():
     [cs] = sdk.proposals
     assert result == {"status": "proposed", "skillId": "sql_injection",
                       "reviewProposal": {"extensionPoint": "skill.text", "changeSetId": cs["changeSetId"]},
-                      "message": "Skiller proposes v2 of SQL Injection."}
+                      "message": "Skiller proposes v2 of SQL Injection.",
+                      "stats": {"modelCalls": {"diagnose": 1, "edit": 1, "repair": 0}, "lessons": 1,
+                                "droppedLessons": 1, "edits": 1, "droppedEdits": 0, "repaired": 0}}
     assert cs["scope"] == "user" and cs["targetGroup"] == "sql_injection"
     assert set(cs["parts"]) == {"tools"}
     assert "### Step 2: Run sqlmap (kali_shell)\nTest one parameter at a time" in cs["parts"]["tools"]
@@ -135,8 +137,9 @@ def test_too_many_pending_before_any_model_call():
 def test_skill_fit_poor_is_no_improvement():
     a = json.dumps({"skill_fit": "poor", "outcome": "Not SQL injection at all.", "lessons": [LESSON]})
     result, sdk, llm = _run([a])
-    assert result == {"status": "no_improvement", "skillId": "sql_injection",
-                      "message": "This session did not fit the SQL Injection skill, so it is not a good basis for improving it."}
+    assert result["status"] == "no_improvement" and result["skillId"] == "sql_injection"
+    assert result["message"] == "This session did not fit the SQL Injection skill, so it is not a good basis for improving it."
+    assert result["stats"]["modelCalls"] == {"diagnose": 1, "edit": 0, "repair": 0}
     assert sdk.proposals == [] and len(llm.prompts) == 1
 
 
@@ -268,3 +271,12 @@ def test_identifiers_never_reach_the_proposal_note_or_meta():
     _, sdk, _ = _run([a, b])
     stored = json.dumps({"note": sdk.proposals[0]["note"], "meta": sdk.proposals[0]["meta"]})
     assert HOST not in stored and IP4 not in stored
+
+
+def test_stats_count_retries_and_the_repair_round_without_session_text():
+    leaking = dict(GOOD_EDIT, text=f"On {HOST} test one parameter at a time.")
+    b1 = json.dumps({"edits": [leaking], "summary": "s", "changelog": ["c"]})
+    result, _, _ = _run(["not json", A_GOOD, b1, B_GOOD])
+    assert result["stats"]["modelCalls"] == {"diagnose": 2, "edit": 1, "repair": 1}
+    assert result["stats"]["repaired"] == 1
+    assert HOST not in json.dumps(result["stats"])

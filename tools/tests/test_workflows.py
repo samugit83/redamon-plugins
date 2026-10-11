@@ -1,4 +1,4 @@
-"""The GitHub workflows: what they run, and the controls around the signing key (D-25, D-26)."""
+"""The GitHub workflows: what they run, and the controls around the signing key (D-25, D-26, D-30)."""
 
 import re
 
@@ -8,7 +8,8 @@ import yaml
 from support import ROOT
 
 WORKFLOWS = ROOT / ".github" / "workflows"
-NAMES = ("ci.yml", "release.yml", "catalog-refresh.yml")
+NAMES = ("ci.yml", "release.yml", "catalog-resign.yml", "revoke.yml")
+SIGNING = ("release.yml", "catalog-resign.yml", "revoke.yml")
 PINNED_USES = re.compile(r"^\s*-?\s*uses:\s*([\w.-]+/[\w./-]+)@([0-9a-f]{40})\s+#\s*v\d+\.\d+\.\d+\s*$")
 
 
@@ -85,7 +86,7 @@ def _signing_job(wf):
     return jobs[0]
 
 
-@pytest.mark.parametrize("name", ["release.yml", "catalog-refresh.yml"])
+@pytest.mark.parametrize("name", SIGNING)
 def test_signing_runs_in_the_protected_environment_one_at_a_time(name):
     job = _signing_job(_load(name))
     assert job.get("concurrency") == {"group": "catalog", "cancel-in-progress": False}
@@ -115,14 +116,43 @@ def test_release_runs_on_plugin_tags_and_tests_before_it_signs():
     assert "gh release" in publish and "tools/catalog.py add-release" in publish
 
 
-def test_refresh_is_monthly_and_by_hand():
-    triggers = _triggers(_load("catalog-refresh.yml"))
-    assert "workflow_dispatch" in triggers
-    [schedule] = triggers["schedule"]
-    minute, hour, day, month, weekday = schedule["cron"].split()
-    assert (day, month, weekday) == ("1", "*", "*")
-    scripts = "\n".join(step.get("run", "") for step in _signing_job(_load("catalog-refresh.yml"))["steps"])
-    assert "tools/catalog.py refresh" in scripts
+@pytest.mark.parametrize("name", NAMES)
+def test_nothing_runs_on_a_schedule(name):
+    # A catalog never expires (the owner's decision of 2026-10-11), so no routine re-signing
+    # waits for an approval.
+    assert "schedule" not in _triggers(_load(name))
+
+
+def test_resign_is_by_hand_only():
+    wf = _load("catalog-resign.yml")
+    assert set(_triggers(wf)) == {"workflow_dispatch"}
+    scripts = "\n".join(step.get("run", "") for step in _signing_job(wf)["steps"])
+    assert "tools/catalog.py resign" in scripts
+
+
+def test_revoke_is_by_hand_with_its_inputs_passed_through_env():
+    wf = _load("revoke.yml")
+    triggers = _triggers(wf)
+    assert set(triggers) == {"workflow_dispatch"}
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert inputs["action"]["type"] == "choice" and inputs["action"]["options"] == ["revoke", "unrevoke"]
+    assert inputs["action"]["required"] is True
+    for name in ("plugin", "version"):
+        assert inputs[name]["required"] is True and inputs[name]["type"] == "string"
+    assert inputs["reason"]["type"] == "string"
+    job = _signing_job(wf)
+    run_step = next(st for st in job["steps"] if "tools/catalog.py" in st.get("run", ""))
+    assert run_step["env"] == {
+        "ACTION": "${{ inputs.action }}",
+        "PLUGIN": "${{ inputs.plugin }}",
+        "VERSION": "${{ inputs.version }}",
+        "REASON": "${{ inputs.reason }}",
+    }
+    script = run_step["run"]
+    assert 'tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason "$REASON"' in script
+    assert 'tools/catalog.py unrevoke "$PLUGIN" "$VERSION"' in script
+    commit = next(st for st in job["steps"] if "git commit" in st.get("run", ""))
+    assert "${{" not in commit["run"] and "$ACTION" in commit["run"]
 
 
 def test_ci_validates_and_tests_everything_without_secrets():
@@ -141,7 +171,7 @@ def test_every_workflow_uses_the_default_branch():
     # The catalog URL every RedAmon reads names this branch; the workflows that write the
     # catalog and the CI trigger must name the same one.
     assert _triggers(_load("ci.yml"))["push"]["branches"] == [DEFAULT_BRANCH]
-    for name in ("release.yml", "catalog-refresh.yml"):
+    for name in SIGNING:
         job = _signing_job(_load(name))
         checkout = next(s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))
         assert checkout["with"]["ref"] == DEFAULT_BRANCH, name

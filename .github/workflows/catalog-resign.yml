@@ -1,12 +1,10 @@
-# Re-signs the unchanged catalog with a new expiry (90 days) and serial + 1, monthly and by
-# hand, after the `release` environment's reviewer approves. Left unapproved, the catalog
-# expires: installed plugins keep running, installs and updates stop until a fresh one is
-# signed (RedAmon warns 14 days before).
-name: Catalog refresh
+# Signs the unchanged catalog again, with `serial` + 1, by hand only (Actions → Run workflow),
+# after the `release` environment's reviewer approves. A catalog never expires, so this is not a
+# routine task: it is for a key rotation (README.PLUGINS.md §6.4 in RedAmon), so the catalog is
+# signed with the new key at once instead of at the next release.
+name: Catalog re-sign
 
 on:
-  schedule:
-    - cron: "17 6 1 * *"
   workflow_dispatch:
 
 permissions:
@@ -17,8 +15,8 @@ defaults:
     shell: bash
 
 jobs:
-  refresh:
-    name: Re-sign the catalog with a new expiry
+  resign:
+    name: Re-sign the catalog
     runs-on: ubuntu-24.04
     environment: release
     concurrency:
@@ -39,33 +37,22 @@ jobs:
       - name: Install the pinned tools
         run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
 
-      - name: Refresh the expiry and the serial
-        id: refresh
-        run: |
-          set -euo pipefail
-          if [[ ! -f catalog.json ]]; then
-            echo "No catalog yet (no release so far): nothing to refresh."
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          python tools/catalog.py refresh
-          echo "present=true" >> "$GITHUB_OUTPUT"
+      - name: Raise the serial
+        run: python tools/catalog.py resign
 
       - name: Sign the catalog
-        if: steps.refresh.outputs.present == 'true'
         env:
           CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
           CATALOG_SIGNING_KEY_ID: ${{ secrets.CATALOG_SIGNING_KEY_ID }}
         run: python tools/sign.py catalog.json
 
       - name: Commit the catalog to master
-        if: steps.refresh.outputs.present == 'true'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add catalog.json catalog.json.sig
-          git commit -m "chore(catalog): refresh the expiry and the signature"
+          git commit -m "chore(catalog): re-sign"
           git fetch origin master
           git rebase origin/master
           git push origin HEAD:master

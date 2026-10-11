@@ -1,0 +1,92 @@
+# Revokes a published plugin version, or lifts a revocation, by hand only (Actions → Run
+# workflow), after the `release` environment's reviewer approves. A revoked version stays in
+# the catalog and is listed in `revoked` with its reason: every RedAmon stops it at its next
+# reconcile (README.md, "Revoking a version"). The inputs reach the shell only through env, and
+# tools/catalog.py refuses a plugin or version the catalog does not list.
+name: Revoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "revoke stops the version everywhere; unrevoke lifts that"
+        type: choice
+        options: [revoke, unrevoke]
+        required: true
+      plugin:
+        description: "Plugin id, e.g. skiller"
+        type: string
+        required: true
+      version:
+        description: "Released version, e.g. 1.0.1"
+        type: string
+        required: true
+      reason:
+        description: "Revoke only: why, as RedAmon will show it on the plugin's card (500 characters at most)"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  revoke:
+    name: Change the catalog's revocations and sign it
+    runs-on: ubuntu-24.04
+    environment: release
+    concurrency:
+      group: catalog
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the pinned tools
+        run: pip install --no-cache-dir --disable-pip-version-check --no-deps -r tools/requirements-tools.txt
+
+      - name: Change the revocations
+        env:
+          ACTION: ${{ inputs.action }}
+          PLUGIN: ${{ inputs.plugin }}
+          VERSION: ${{ inputs.version }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          case "$ACTION" in
+            revoke) python tools/catalog.py revoke "$PLUGIN" "$VERSION" --reason "$REASON" ;;
+            unrevoke) python tools/catalog.py unrevoke "$PLUGIN" "$VERSION" ;;
+            *) echo "unknown action" >&2; exit 1 ;;
+          esac
+
+      - name: Sign the catalog
+        env:
+          CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
+          CATALOG_SIGNING_KEY_ID: ${{ secrets.CATALOG_SIGNING_KEY_ID }}
+        run: python tools/sign.py catalog.json
+
+      - name: Commit the catalog to master
+        env:
+          ACTION: ${{ inputs.action }}
+          PLUGIN: ${{ inputs.plugin }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json catalog.json.sig
+          git commit -m "chore(catalog): $ACTION $PLUGIN $VERSION"
+          git fetch origin master
+          git rebase origin/master
+          git push origin HEAD:master

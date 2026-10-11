@@ -15,10 +15,10 @@ from the Plugins page of a RedAmon instance with the plugin platform switched on
 ```
 README.md  LICENSE  .gitignore
 .github/CODEOWNERS            every plugin folder, tools/, .github/ and the catalog need the owner's review
-.github/workflows/            ci.yml, release.yml, catalog-refresh.yml
+.github/workflows/            ci.yml, release.yml, revoke.yml, catalog-resign.yml
 .platform-sdk/<version>/      synced copy of the platform contract, one folder per platform version
 tools/                        validate, pack, catalog, sign, gen_key, semver, sync_sdk, run_tests
-catalog.json, catalog.json.sig   written only by the release and refresh workflows, never by hand
+catalog.json, catalog.json.sig   written only by the release, revoke and re-sign workflows, never by hand
 <plugin>/                     one folder per plugin
 ```
 
@@ -65,7 +65,7 @@ All tools are Python 3.11 scripts. Run them in a container, as the tests do (see
 |---|---|
 | `tools/validate.py <plugin>` | Checks the manifest and every `ui/*.json` against the platform schemas plus the rules a schema cannot hold (contributions name declared actions, `llm` needs `llm:invoke`, a core screen needs its permission, screen depth), the folder layout, that each entry is an `async def`, the imports (standard library, SDK, own `vendor/` only; never another plugin), the `platform` range, and a `CHANGELOG.md` section for the manifest version. |
 | `tools/pack.py <plugin>` | Writes `dist/<id>-<version>.tar.gz`: a deterministic POSIX ustar archive (sorted entries, zero times and owners, modes 0644/0755, no links) without `tests/`, `eval/` or caches. Two packs of one folder are byte-identical. Prints the sha256 and size. |
-| `tools/catalog.py add-release\|refresh\|local` | Adds a release to `catalog.json` (fields from the manifest and the archive), re-signs an unchanged catalog with a new expiry, or writes a one-release catalog for an offline install. `serial` only grows; `expires` defaults to 90 days. |
+| `tools/catalog.py add-release\|revoke\|unrevoke\|resign\|local` | Adds a release to `catalog.json` (fields from the manifest and the archive); lists a released version in `revoked` with its reason, or lifts that; raises only the serial so the unchanged catalog can be signed again; or writes a one-release catalog for an offline install. `serial` only grows. A catalog has no expiry. |
 | `tools/sign.py <catalog.json>` | Ed25519 over the exact bytes, key from the environment variable `CATALOG_SIGNING_KEY` (PEM); writes `<catalog>.sig` = `{"keyId", "sig"}`. |
 | `tools/gen_key.py --out <dir>` | A new Ed25519 key pair, written outside every git repository (`0600`); prints the public key and its key id. |
 | `tools/semver.py` | The version-range grammar of the platform (`>=1.0.0 <2.0.0`: comparators `>= > <= < =` on full `x.y.z`), held equal to RedAmon's by the shared cases. |
@@ -95,8 +95,8 @@ tag, `release.yml` runs two jobs:
    tests on the lowest synced platform version its range accepts, and packs only that folder
    (deterministic archive, sha256);
 2. **publish**, in the protected environment `release`, **after a reviewer approves**: creates the
-   GitHub release with the archive, adds it to `catalog.json`, increments `serial`, sets `expires`
-   to 90 days, signs the catalog, and commits `catalog.json` and `catalog.json.sig` to `master` as
+   GitHub release with the archive, adds it to `catalog.json`, increments `serial`, signs the
+   catalog, and commits `catalog.json` and `catalog.json.sig` to `master` as
    `github-actions[bot]` ("chore(catalog): add <plugin> <version>").
 
 Two tags pushed together queue in one concurrency group (`catalog`), so they never race on the
@@ -134,7 +134,7 @@ approval and took 13 s; the raw catalog URL served the new catalog 17 s after th
 
 - A version number is used once. Never move or delete a published tag or GitHub release: the
   catalog pins the archive's sha256, and installations may already hold it. A broken release is
-  fixed by the next patch version.
+  fixed by the next patch version; a harmful one is also revoked ("Revoking a version" below).
 - **The build job fails** (tests, validation, tag and manifest disagree): nothing is published.
   A transient failure (a runner or network outage) is retried with Actions → the run → **Re-run
   failed jobs**, which rebuilds the same commit. A real failure is fixed on `master` and released
@@ -145,19 +145,36 @@ approval and took 13 s; the raw catalog URL served the new catalog 17 s after th
   7 days (the archive built by the first job is kept 7 days; after that, **Re-run all jobs**). A
   re-run is safe at any step: the archive is byte-identical, an existing GitHub release gets the
   same file again, and the catalog entry of that version is replaced, not duplicated.
-- **Revoking a published version** (listing it in the catalog's `revoked`, which disables it on
-  every installation) has no command or workflow yet: `catalog.py` cannot add an entry to
-  `revoked`, and only the `release` environment can sign. Until one exists, release the next patch
-  version.
 
-### The monthly catalog refresh
+### Revoking a version
 
-`catalog-refresh.yml` runs on the 1st of each month at 06:17 UTC (and by hand from Actions): it
-re-signs the unchanged catalog with `expires` = 90 days and `serial` + 1. It needs the same
-approval as a release, so the reviewer gets an e-mail every month; approving it is the one routine
-chore. Every release also resets the expiry. Left unapproved for about two months, the catalog
-expires: installed plugins keep running, but installs and updates stop until a fresh catalog is
-signed. RedAmon's Plugins page warns 14 days before.
+A patch release fixes a bad version only where an admin clicks **Update**. A revocation stops it
+everywhere: the version stays in the catalog and is listed in `revoked` with a reason, and every
+RedAmon, at its next reconcile (every 5 minutes, plus up to 5 minutes of raw CDN cache), stops
+that plugin's actions and worker, hides its menu items, stops applying the skill versions it
+proposed (the agent uses the built-in text), and shows "Revoked by the catalog: <reason>" on its
+card. The admin's enabled/disabled setting is not touched, and the version is never offered for
+a new install.
+
+1. Usually, first publish the fix as the next patch version (above), so admins have something
+   to update to.
+2. Actions → **Revoke** → **Run workflow** on `master`: action `revoke`, the plugin id, the
+   released version, and the reason RedAmon will show (500 characters at most).
+3. Approve the `release` deployment, as for a release. The workflow refuses a plugin or version
+   the catalog does not list, an empty reason, and a revocation that changes nothing.
+4. `git pull` to get the bot's `chore(catalog): revoke <plugin> <version>` commit.
+
+A mistaken revocation is lifted the same way with action `unrevoke`; RedAmon serves the version
+again at its next reconcile. Locally, the same change is
+`python tools/catalog.py revoke <plugin> <version> --reason "…"` (or `unrevoke`), but only the
+workflow can sign it.
+
+### Re-signing the catalog
+
+A catalog never expires (the owner's decision of 2026-10-11): there is no routine re-signing and
+no monthly approval. **Catalog re-sign** (Actions → Run workflow, then approve) signs the
+unchanged catalog again with `serial` + 1. It is needed only after a key rotation (RedAmon's
+`docs/readmes/README.PLUGINS.md` §6.4), so the catalog carries the new key at once.
 
 ### Repository settings
 

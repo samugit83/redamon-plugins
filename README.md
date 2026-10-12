@@ -4,7 +4,12 @@ The plugins of [RedAmon](https://github.com/samugit83/redamon), each in its own 
 tools and workflows that release them. RedAmon itself holds the plugin **platform** (the Plugin
 Runner, the Gateway, the Plugin Manager and the screens that review what a plugin proposes); this
 repository holds the plugin **code**. Nothing here runs until an administrator installs a plugin
-from the Plugins page of a RedAmon instance with the plugin platform switched on.
+from the Plugins page of a RedAmon instance.
+
+**Want to add a plugin or improve one?** You do not need write access: fork this repository,
+build and test in your fork, and open a pull request. An administrator reviews, merges and
+releases it. The procedure is in [CONTRIBUTING.md](CONTRIBUTING.md). The sections from
+"Releases" on are the administrators' runbook.
 
 ## The plugins
 
@@ -42,7 +47,7 @@ README.md  LICENSE  .gitignore
 .github/CODEOWNERS            every plugin folder, tools/, .github/ and the catalog need the owner's review
 .github/workflows/            ci.yml, release.yml, revoke.yml, catalog-resign.yml, listings.yml
 .platform-sdk/<version>/      synced copy of the platform contract, one folder per platform version
-tools/                        validate, pack, catalog, listing, sign, gen_key, semver, sync_sdk, run_tests
+tools/                        validate, pack, catalog, listing, sign, gen_key, semver, sync_sdk, run_tests, run
 catalog.json, catalog.json.sig   written only by the release, revoke, re-sign and listings workflows, never by hand
 <plugin>/                     one folder per plugin
 ```
@@ -97,7 +102,10 @@ lowest platform version its `platform` range accepts.
 
 ## Tools
 
-All tools are Python 3.11 scripts. Run them in a container, as the tests do (see "Tests").
+All tools are Python 3.11 scripts. Run them with `tools/run.sh <tool> [args]`, which starts them
+in the same pinned image as the tests (see "Tests"): `validate.py` and `catalog.py` need
+`jsonschema`, `sign.py` and `gen_key.py` need `cryptography`, so plain `python:3.11-slim` is not
+enough.
 
 | Tool | Does |
 |---|---|
@@ -107,6 +115,7 @@ All tools are Python 3.11 scripts. Run them in a container, as the tests do (see
 | `tools/listing.py` | The rules of a plugin's listing, shared by validate, pack and catalog (no command of its own). |
 | `tools/sign.py <catalog.json>` | Ed25519 over the exact bytes, key from the environment variable `CATALOG_SIGNING_KEY` (PEM); writes `<catalog>.sig` = `{"keyId", "sig"}`. |
 | `tools/gen_key.py --out <dir>` | A new Ed25519 key pair, written outside every git repository (`0600`); prints the public key and its key id. |
+| `tools/run.sh <tool> [args]` | Runs `tools/<tool>.py` in the pinned tools image with the repository mounted read-write (`dist/` is ignored by git). `KEYS_DIR`, when set, is mounted at `/keys`; `CATALOG_SIGNING_KEY` is passed through when set. |
 | `tools/semver.py` | The version-range grammar of the platform (`>=1.0.0 <2.0.0`: comparators `>= > <= < =` on full `x.y.z`), held equal to RedAmon's by the shared cases. |
 
 ## Tests
@@ -159,7 +168,7 @@ approval and took 13 s; the raw catalog URL served the new catalog 17 s after th
 6. Only if the plugin needs a newer platform feature: `tools/sync_sdk.sh <path-to-redamon>
    <git-ref>` and raise the lower bound of `platform`. Installations on an older RedAmon keep the
    previous release, because RedAmon installs the newest release its platform version accepts.
-7. `tools/run_tests.sh <plugin>` and `tools/validate.py <plugin>` (in the container, see "Tests").
+7. `tools/run_tests.sh <plugin>` and `tools/run.sh validate <plugin>`.
 8. Commit and push `master`; wait for the CI run to be green.
 9. Tag that commit and push the tag:
    `git tag <plugin>-v<x.y.z> && git push origin <plugin>-v<x.y.z>`.
@@ -274,26 +283,31 @@ There is no "load a folder" mode: a plugin is installed the same way as in produ
 signed catalog, here an offline one signed with a development key.
 
 ```bash
-python tools/gen_key.py --out ~/.config/redamon-plugins/dev        # once
-python tools/validate.py <plugin> && python tools/pack.py <plugin>
-python tools/catalog.py local <plugin> --archive dist/<plugin>-<version>.tar.gz \
+KEYS_DIR=~/.config/redamon-plugins tools/run.sh gen_key --out /keys/dev      # once
+tools/run.sh validate <plugin> && tools/run.sh pack <plugin>
+tools/run.sh catalog local <plugin> --archive dist/<plugin>-<version>.tar.gz \
   --url https://github.com/<owner>/redamon-plugins/releases/download/<plugin>-v<version>/<plugin>-<version>.tar.gz \
   --out dist/catalog.json
-CATALOG_SIGNING_KEY="$(cat ~/.config/redamon-plugins/dev/signing-key.pem)" python tools/sign.py dist/catalog.json
+CATALOG_SIGNING_KEY="$(cat ~/.config/redamon-plugins/dev/signing-key.pem)" tools/run.sh sign dist/catalog.json
 ```
+
+`gen_key` writes `signing-key.pem` (mode 0600) outside every git repository and prints the
+`PLUGINS_EXTRA_TRUSTED_KEYS` value for the next step; it refuses a folder that already holds a
+key. The `--url` is only recorded: **Install from file** uploads the archive itself.
 
 With `--url` alone the local catalog lists no icon (the tool warns); add
 `--listing-repo <owner>/redamon-plugins` to point it at the raw file on `master`.
 
-Then, on the RedAmon host: set `PLUGINS_ENABLED=true` and
-`PLUGINS_EXTRA_TRUSTED_KEYS=[{"keyId":"…","publicKey":"…"}]` (the values `gen_key.py` printed)
-in `.env`, run `./redamon.sh up`, and use **Install from file** on the Plugins page with the
-archive, `catalog.json` and `catalog.json.sig`. The page warns while an extra key is trusted;
-remove it when you are done. (Run these commands in `python:3.11-slim` too, for example
-`docker run --rm -v "$PWD:/repo" -w /repo python:3.11-slim python tools/pack.py <plugin>`; only
-`sign.py` and `gen_key.py` need `cryptography`, which the test image has.)
+Then, on the RedAmon host: set `PLUGINS_EXTRA_TRUSTED_KEYS=[{"keyId":"…","publicKey":"…"}]`
+(the line `gen_key` printed) in `.env`, run `./redamon.sh up`, and, as an admin, use **Install
+from file** on the Plugins page with the archive, `catalog.json` and `catalog.json.sig`. The page
+warns while an extra key is trusted; remove the line when you are done.
 
-## Adding a plugin
+## Adding a plugin (maintainers)
+
+For administrators with write access, adding a plugin of their own. Anyone else follows
+[CONTRIBUTING.md](CONTRIBUTING.md); an administrator then merges it as in "Merging a contributed
+plugin" below.
 
 1. `git pull`, then create `<plugin>/` with the layout above; the id matches
    `^[a-z][a-z0-9-]{1,39}$` and is never reused for another plugin.
@@ -303,7 +317,7 @@ remove it when you are done. (Run these commands in `python:3.11-slim` too, for 
    README: what it reads, what it stores, what a person must approve. Add `CHANGELOG.md` with
    `## [1.0.0]`.
 3. Write tests with `FakeSdk` and `ScriptedLlm`; `tools/run_tests.sh <plugin>` and
-   `tools/validate.py <plugin>` must pass.
+   `tools/run.sh validate <plugin>` must pass.
 4. Add the line `/<plugin>/ @samugit83` to `.github/CODEOWNERS`, and a block for the plugin
    under "The plugins" at the top of this README, in the shape of the ones there. Optional: a
    listing (`listing.json` and an icon, "Layout" above), shown on the plugin's card in RedAmon.
@@ -315,6 +329,31 @@ remove it when you are done. (Run these commands in `python:3.11-slim` too, for 
 
 No RedAmon release is needed for a new plugin, unless it needs a platform feature RedAmon does
 not have yet, or the signing key changes.
+
+## Merging a contributed plugin (maintainers)
+
+A pull request from a fork, a new plugin or a new version of one, follows
+[CONTRIBUTING.md](CONTRIBUTING.md). Merging it and releasing it are two separate acts, both
+yours: the catalog key signs every plugin, so a release says that you reviewed this code.
+
+1. Read the whole diff, not only the CI result. Check what "What the review checks" in
+   CONTRIBUTING.md lists: the fewest permissions, readable code, a pure-Python `vendor/` with its
+   licences, no real target data, nothing printed to the log that a transcript would leak, and a
+   README that says what the plugin reads, stores and proposes. A pull request may touch only its
+   plugin's folder, its `CODEOWNERS` line and its README block.
+2. If GitHub holds CI for a first-time contributor, start it only after reading the diff: the
+   workflow has no secrets and a read-only token, but it does run their code.
+3. Check it out and run it yourself: `gh pr checkout <n>`, then `tools/run.sh validate <plugin>`
+   and `tools/run_tests.sh <plugin>`; for a plugin that changes what the agent reads, install it
+   on a local RedAmon with a development key ("Developing a plugin against a local RedAmon").
+4. Ask for changes on the pull request until it is right, then merge it into `master`.
+5. Release it from your own clone: `git pull`, then "Releasing a new version of a plugin" from
+   step 8, with the tag on the merge commit (`git tag <plugin>-v<x.y.z> <merge-sha>`). Never tag a
+   commit whose plugin folder you have not reviewed.
+6. Tell the contributor the release is out; they cannot see the approval step.
+
+A contributor never gets write access for their plugin: `CODEOWNERS` names an administrator for
+every folder, and further versions come as pull requests the same way.
 
 ## Licence
 

@@ -10,7 +10,7 @@ Nothing here is packed into the plugin.
 
 Prerequisites, on the RedAmon host:
 
-1. The plugin platform on (`PLUGINS_ENABLED=true`), Skiller installed and enabled.
+1. Skiller installed and enabled (the plugin platform is part of every RedAmon).
 2. A user who owns a project, with a model chosen for **Skiller** in Settings → Models by feature.
    Any provider works; for a dry run of the harness itself, use the stub model of RedAmon's
    `testing/e2e/scripts/stub-llm-server.mjs` (a custom OpenAI-compatible provider).

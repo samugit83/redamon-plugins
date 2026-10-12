@@ -13,7 +13,7 @@ import sys
 import pytest
 
 import validate
-from support import ROOT
+from support import DOCS_URL, ICONS, ROOT
 
 
 def _manifest(plugin):
@@ -341,3 +341,98 @@ def test_data_version_needs_its_up_migrations(good_plugin):
 def test_migrations_follow_the_import_rule(good_plugin):
     (good_plugin / "migrations" / "0002_up.py").write_text("import requests\n\ndef migrate_row(row):\n    return row\n")
     assert "migrations/0002_up.py:1: imports requests" in "\n".join(validate.validate(good_plugin))
+
+
+# -- the listing: listing.json and its icon ---------------------------------------------------
+
+def _listing(plugin, doc, files=None):
+    """Writes listing.json (none when `doc` is None) and the given files; the errors, one per line."""
+    if doc is not None:
+        (plugin / "listing.json").write_text(json.dumps(doc), encoding="utf-8")
+    for name, data in (files or {}).items():
+        (plugin / name).write_bytes(data)
+    return "\n".join(validate.validate(plugin))
+
+
+@pytest.mark.parametrize("name", sorted(ICONS))
+def test_a_listing_with_its_icon_passes(good_plugin, name):
+    assert _listing(good_plugin, {"icon": name, "docsUrl": DOCS_URL}, {name: ICONS[name]}) == ""
+
+
+@pytest.mark.parametrize("doc", [{}, {"docsUrl": DOCS_URL}])
+def test_a_listing_without_an_icon_passes(good_plugin, doc):
+    assert _listing(good_plugin, doc) == ""
+
+
+def test_an_icon_of_exactly_256_kib_passes(good_plugin):
+    assert _listing(good_plugin, {"icon": "icon.png"}, {"icon.png": ICONS["icon.png"].ljust(262_144, b"\0")}) == ""
+
+
+@pytest.mark.parametrize("doc, files, message", [
+    ({"icon": "icon.png"}, {}, "listing.json icon: icon.png is missing"),
+    ({"icon": "icon.png"}, {"icon.png": ICONS["icon.jpg"]}, "icon.png: the bytes are not image/png (they must match the extension)"),
+    ({"icon": "icon.jpg"}, {"icon.jpg": ICONS["icon.png"]}, "icon.jpg: the bytes are not image/jpeg"),
+    ({"icon": "icon.webp"}, {"icon.webp": ICONS["icon.webp"].replace(b"WEBP", b"AVI ")}, "icon.webp: the bytes are not image/webp"),
+    ({"icon": "icon.png"}, {"icon.png": ICONS["icon.png"].ljust(262_145, b"\0")}, "icon.png: 262145 bytes; at most 262144 (256 KiB)"),
+    ({"icon": "icon.png"}, {"icon.png": b""}, "icon.png is empty"),
+    ({"icon": "logo.png"}, {}, "listing.json icon: must be one of icon.jpg, icon.png, icon.webp"),
+    ({"icon": "ui/icon.png"}, {}, "listing.json icon: must be one of"),
+    ({"icon": None}, {}, "listing.json icon: must be one of"),
+    ({"icon": ["icon.png"]}, {"icon.png": ICONS["icon.png"]}, "listing.json icon: must be one of"),
+    ({"color": "red"}, {}, 'listing.json: unknown key "color" (only icon and docsUrl)'),
+    (None, {"icon.png": ICONS["icon.png"]}, "icon.png is not named by listing.json"),
+    ({"docsUrl": DOCS_URL}, {"icon.png": ICONS["icon.png"]}, "icon.png is not named by listing.json"),
+    ({"icon": "icon.jpg"}, {"icon.jpg": ICONS["icon.jpg"], "icon.webp": ICONS["icon.webp"]},
+     "icon.webp is not named by listing.json"),
+    (["icon.png"], {}, "listing.json is not a JSON object"),
+])
+def test_a_listing_that_breaks_a_rule(good_plugin, doc, files, message):
+    assert message in _listing(good_plugin, doc, files)
+
+
+# RedAmon parses docsUrl with `new URL` and counts it in UTF-16 units, as JavaScript does.
+@pytest.mark.parametrize("url, message", [
+    ("http://example.com/docs", "must be an https:// URL"),
+    ("HTTPS://example.com/docs", "must be an https:// URL"),
+    (42, "must be an https:// URL"),
+    ("https://example.com/a docs", "must not contain whitespace"),
+    ("https://example.com/docs\n", "must not contain whitespace"),
+    pytest.param("https://example.com/" + "a" * 481, "is longer than 500 characters", id="501-characters"),
+    pytest.param("https://example.com/" + "\U0001F600" * 241, "is longer than 500 characters", id="502-utf16-units"),
+    ("https://", "needs a host name"),
+    ("https://[::1]/docs", "needs a host name"),
+    ("https://192.0.2.1/docs", "needs a host name"),
+    ("https://ex%61mple.com/docs", "needs a host name"),
+    ("https://[::1/docs", "is not a valid URL"),
+    ("https://example.com:99999/docs", "is not a valid URL"),
+])
+def test_docs_url_must_be_an_https_url_redamon_accepts(good_plugin, url, message):
+    assert f"listing.json docsUrl: {message}" in _listing(good_plugin, {"docsUrl": url})
+
+
+def test_a_docs_url_of_exactly_500_characters_passes(good_plugin):
+    url = "https://example.com/" + "a" * 480
+    assert len(url) == 500
+    assert _listing(good_plugin, {"docsUrl": url}) == ""
+
+
+def test_listing_not_json(good_plugin):
+    (good_plugin / "listing.json").write_text("{not json")
+    assert "listing.json: not valid JSON" in "\n".join(validate.validate(good_plugin))
+
+
+def test_a_symlinked_icon_is_refused(good_plugin, tmp_path):
+    (tmp_path / "elsewhere.png").write_bytes(ICONS["icon.png"])
+    os.symlink(tmp_path / "elsewhere.png", good_plugin / "icon.png")
+    assert "icon.png is a symbolic link" in _listing(good_plugin, {"icon": "icon.png"})
+
+
+def test_an_image_under_another_name_is_unexpected(good_plugin):
+    assert "unexpected top-level entry: logo.png" in _listing(good_plugin, None, {"logo.png": ICONS["icon.png"]})
+
+
+def test_cli_names_the_plugin_on_a_listing_error(good_plugin):
+    (good_plugin / "listing.json").write_text(json.dumps({"icon": "icon.png"}))
+    bad = subprocess.run([sys.executable, str(ROOT / "tools" / "validate.py"), str(good_plugin)], capture_output=True, text=True)
+    assert bad.returncode == 1
+    assert "good: listing.json icon: icon.png is missing" in bad.stdout

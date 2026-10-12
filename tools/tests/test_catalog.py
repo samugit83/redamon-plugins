@@ -5,15 +5,19 @@ first write after it drops the field from a catalog signed before.
 """
 
 import datetime as dt
+import hashlib
 import json
 
 import jsonschema
 import pytest
 
 import catalog
+from support import DOCS_URL, ICONS
 
 NOW = dt.datetime(2026, 10, 11, 12, 0, 0, tzinfo=dt.timezone.utc)
 URL = "https://github.com/samugit83/redamon-plugins/releases/download/good-v1.2.0/good-1.2.0.tar.gz"
+REPO = "samugit83/redamon-plugins"
+ICON_URL = "https://raw.githubusercontent.com/samugit83/redamon-plugins/master/good/icon.png"
 
 
 def _archive(tmp_path, content=b"archive bytes", manifest=None):
@@ -341,3 +345,186 @@ def test_cli_revoke_unrevoke_and_resign(good_plugin, tmp_path, capsys):
     with pytest.raises(SystemExit) as no_reason:
         catalog.main(["revoke", "good", "1.2.0", "--catalog", str(out)])
     assert no_reason.value.code == 2, "--reason is required"
+
+
+# --- the listing: the icon and docs link RedAmon shows on a plugin's card ---------------------
+
+ENTRY_KEYS = ["id", "displayName", "description", "icon", "docsUrl", "releases"]
+UNLISTED_KEYS = ["id", "displayName", "description", "releases"]
+# A plugin with a listing whose folder is not in this repository.
+ECHO = {"id": "echo", "displayName": "Echo", "description": "d",
+        "icon": {"url": "https://raw.githubusercontent.com/x/y/master/echo/icon.webp", "sha256": "1" * 64,
+                 "size": 9, "type": "image/webp"},
+        "docsUrl": "https://example.com/docs/echo",
+        "releases": [{"version": "1.0.0", "platform": ">=1.0.0 <2.0.0", "dataVersion": 1,
+                      "url": "https://github.com/x/y/releases/download/echo-v1.0.0/echo-1.0.0.tar.gz",
+                      "sha256": "0" * 64, "permissions": []}]}
+
+
+def _with_echo(out):
+    doc = _read(out)
+    doc["plugins"].insert(0, ECHO)
+    out.write_text(json.dumps(doc, indent=2) + "\n")
+
+
+def _unlist(plugin):
+    for name in ("listing.json", "icon.png"):
+        (plugin / name).unlink()
+
+
+def test_add_release_lists_the_icon_and_docs_url_of_the_folder(listed_plugin, tmp_path, sdk_dir):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    doc = _read(out)
+    _schema_ok(sdk_dir, doc)
+    [plugin] = doc["plugins"]
+    assert list(plugin) == ENTRY_KEYS
+    assert plugin["icon"] == {"url": ICON_URL, "sha256": hashlib.sha256(ICONS["icon.png"]).hexdigest(),
+                              "size": len(ICONS["icon.png"]), "type": "image/png"}
+    assert plugin["docsUrl"] == DOCS_URL
+
+
+def test_a_plugin_without_a_listing_has_no_icon_or_docs_url(good_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, good_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    assert list(_read(out)["plugins"][0]) == UNLISTED_KEYS
+
+
+def test_a_folder_without_a_listing_drops_the_one_listed_before(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    _unlist(listed_plugin)
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    assert list(_read(out)["plugins"][0]) == UNLISTED_KEYS
+
+
+def test_the_icon_url_names_the_ref(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO, ref="next")
+    assert _read(out)["plugins"][0]["icon"]["url"] == ICON_URL.replace("/master/", "/next/")
+
+
+@pytest.mark.parametrize("repo, ref, match", [("samugit83", "master", "not a GitHub repository"),
+                                              ("a/b/c", "master", "not a GitHub repository"),
+                                              (REPO, "../x", "not a branch or tag name"),
+                                              (REPO, "a b", "not a branch or tag name")])
+def test_the_icon_url_needs_a_repository_and_a_ref(listed_plugin, tmp_path, repo, ref, match):
+    out = tmp_path / "catalog.json"
+    with pytest.raises(catalog.CatalogError, match=match):
+        catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=repo, ref=ref)
+    assert not out.exists()
+
+
+def test_with_a_url_and_no_repository_the_icon_is_left_out(listed_plugin, tmp_path, capsys):
+    out = tmp_path / "catalog.json"
+    args = ["add-release", str(listed_plugin), "--archive", str(_archive(tmp_path)), "--url", URL, "--catalog", str(out)]
+    assert catalog.main(args) == 0
+    plugin = _read(out)["plugins"][0]
+    assert "icon" not in plugin and plugin["docsUrl"] == DOCS_URL
+    assert "good is listed without its icon" in capsys.readouterr().err
+    assert catalog.main(args + ["--listing-repo", REPO]) == 0
+    assert _read(out)["plugins"][0]["icon"]["url"] == ICON_URL
+    assert "without its icon" not in capsys.readouterr().err
+
+
+def test_the_listing_repository_goes_with_a_url_only(listed_plugin, tmp_path):
+    with pytest.raises(SystemExit) as refused:
+        catalog.main(["add-release", str(listed_plugin), "--archive", str(_archive(tmp_path)), "--repo", REPO,
+                      "--listing-repo", REPO, "--catalog", str(tmp_path / "catalog.json")])
+    assert refused.value.code == 2
+
+
+def test_local_lists_the_icon_and_docs_url(listed_plugin, tmp_path, sdk_dir):
+    out = tmp_path / "dist" / "catalog.json"
+    catalog.local(out, listed_plugin, archive=_archive(tmp_path), url=URL, now=NOW, repo=REPO)
+    doc = _read(out)
+    _schema_ok(sdk_dir, doc)
+    [plugin] = doc["plugins"]
+    assert list(plugin) == ENTRY_KEYS
+    assert plugin["icon"]["url"] == ICON_URL and plugin["docsUrl"] == DOCS_URL
+
+
+def test_a_listing_that_breaks_a_rule_is_refused_and_nothing_is_written(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    (listed_plugin / "listing.json").write_text(json.dumps({"icon": "icon.png", "docsUrl": "http://example.com/docs"}))
+    with pytest.raises(catalog.CatalogError, match="good: listing.json docsUrl: must be an https:// URL"):
+        catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    assert not out.exists()
+
+
+def test_a_listing_survives_revoke_unrevoke_resign_and_another_plugins_release(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    _with_echo(out)
+    plugins = json.dumps(_read(out)["plugins"])
+    catalog.revoke(out, "good", "1.2.0", reason="r")
+    catalog.unrevoke(out, "good", "1.2.0")
+    catalog.resign(out)
+    assert json.dumps(_read(out)["plugins"]) == plugins, "the same entries, key order included"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path, b"again"), url=URL, repo=REPO)
+    assert _read(out)["plugins"][0] == ECHO
+
+
+def test_listings_refreshes_each_entry_from_its_folder(good_plugin, tmp_path, sdk_dir):
+    out = _released(good_plugin, tmp_path, "1.2.0")
+    _with_echo(out)
+    before = _read(out)
+    (good_plugin / "icon.png").write_bytes(ICONS["icon.png"])
+    (good_plugin / "listing.json").write_text(json.dumps({"icon": "icon.png", "docsUrl": DOCS_URL}))
+    catalog.listings(out, repo=REPO, root=good_plugin.parent)
+    doc = _read(out)
+    _schema_ok(sdk_dir, doc)
+    assert doc["serial"] == before["serial"] + 1
+    echo, good = doc["plugins"]
+    assert echo == ECHO, "an entry whose folder is not here is left as it is"
+    assert list(good) == ENTRY_KEYS
+    assert good["icon"]["url"] == ICON_URL and good["docsUrl"] == DOCS_URL
+    assert good["releases"] == before["plugins"][1]["releases"]
+
+
+def test_listings_follows_a_changed_icon_and_a_removed_listing(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    changed = ICONS["icon.png"] + b"\0"
+    (listed_plugin / "icon.png").write_bytes(changed)
+    catalog.listings(out, repo=REPO, root=listed_plugin.parent)
+    icon = _read(out)["plugins"][0]["icon"]
+    assert (icon["sha256"], icon["size"]) == (hashlib.sha256(changed).hexdigest(), len(changed))
+    _unlist(listed_plugin)
+    catalog.listings(out, repo=REPO, root=listed_plugin.parent)
+    assert list(_read(out)["plugins"][0]) == UNLISTED_KEYS
+
+
+def test_listings_refuses_a_no_op(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    _with_echo(out)
+    before = out.read_bytes()
+    with pytest.raises(catalog.CatalogError, match="nothing to change"):
+        catalog.listings(out, repo=REPO, root=listed_plugin.parent)
+    assert out.read_bytes() == before
+
+
+def test_listings_refuses_a_listing_that_breaks_a_rule(listed_plugin, tmp_path):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL, repo=REPO)
+    (listed_plugin / "icon.png").write_bytes(ICONS["icon.jpg"])
+    before = out.read_bytes()
+    with pytest.raises(catalog.CatalogError, match="good: icon.png: the bytes are not image/png"):
+        catalog.listings(out, repo=REPO, root=listed_plugin.parent)
+    assert out.read_bytes() == before
+
+
+def test_cli_listings(listed_plugin, tmp_path, capsys):
+    out = tmp_path / "catalog.json"
+    catalog.add_release(out, listed_plugin, archive=_archive(tmp_path), url=URL)
+    capsys.readouterr()
+    args = ["listings", "--repo", REPO, "--catalog", str(out), "--root", str(listed_plugin.parent)]
+    assert catalog.main(args) == 0
+    assert "serial 2, refreshed the listings" in capsys.readouterr().out
+    assert _read(out)["plugins"][0]["icon"]["url"] == ICON_URL
+    assert catalog.main(args) == 1
+    assert "nothing to change" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as no_repo:
+        catalog.main(["listings", "--catalog", str(out)])
+    assert no_repo.value.code == 2, "--repo is required"

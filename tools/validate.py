@@ -12,6 +12,8 @@ Prints `ok: <id> <version>` and exits 0, or one line per problem and exits 1. It
   `llm:invoke`, a core screen needs its point's permission, one of action/coreScreen, screen
   depth and size, screen references declared;
 - the folder layout, each entry an `async def`, the data migrations' names and shape;
+- the listing (`listing.json` and its icon, tools/listing.py), which the catalog copies onto the
+  plugin's card;
 - imports: plugin code (engine/, migrations/) may import only the standard library,
   `redamon_plugin_sdk`, its own `engine` package and its `vendor/` folder, and never another
   plugin, because workers start with `python -I -S` and see nothing else;
@@ -29,6 +31,7 @@ import sys
 
 import jsonschema
 
+import listing
 import semver
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -36,7 +39,7 @@ SDK_ROOT = ROOT / ".platform-sdk"
 
 REQUIRED_FILES = ("plugin.json", "README.md", "CHANGELOG.md", "engine/__init__.py")
 TOP_LEVEL = {"plugin.json", "README.md", "CHANGELOG.md", "LICENSE",
-             "engine", "vendor", "ui", "migrations", "tests", "eval"}
+             "engine", "vendor", "ui", "migrations", "tests", "eval"} | listing.FILES
 CACHE_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 ENTRY_RE = re.compile(r"(engine(?:/[a-z0-9_]+)+\.py):([a-z_][a-z0-9_]*)")
 MIGRATION_RE = re.compile(r"(\d{4})_(up|down)\.py")
@@ -400,7 +403,7 @@ def validate(plugin, sdk_root: pathlib.Path = SDK_ROOT) -> list:
     plugin = pathlib.Path(plugin)
     if not plugin.is_dir():
         return [f"{plugin} is not a folder"]
-    errors = _layout(plugin)
+    errors = _layout(plugin) + listing.check(plugin)
     if not (plugin / "plugin.json").is_file():
         return errors
     m = _load_json(plugin / "plugin.json", "plugin.json", errors)

@@ -6,19 +6,44 @@ Runner, the Gateway, the Plugin Manager and the screens that review what a plugi
 repository holds the plugin **code**. Nothing here runs until an administrator installs a plugin
 from the Plugins page of a RedAmon instance with the plugin platform switched on.
 
-| Plugin | What it does |
-|---|---|
-| [`skiller/`](skiller/README.md) | Reads a finished agent chat session and proposes a better, session-agnostic version of the built-in skill it used. A person approves every version. |
+## The plugins
+
+One block per plugin: what it does, what it may touch, where to read more. The plugin's own
+README has the details.
+
+### Skiller
+
+<img src="skiller/icon.jpg" alt="Skiller" width="120" align="left">
+
+Skiller proposes better versions of RedAmon's built-in skills (the attack playbooks the agent
+follows, for example SQL injection), learned from real work. Start it from the gear menu of a
+finished chat session: it reads the session, picks the built-in skill the agent used, and drafts
+a new version of it, a few small edits drawn from what worked and what did not. The edits are
+**session-agnostic**: nothing from that target (hosts, addresses, paths, parameters,
+credentials) may enter them, because the playbook runs against every future target.
+
+A person reviews every proposal next to the text it replaces, and nothing changes until they
+approve it; **Reset to factory** always brings the original text back. Skiller stores nothing
+of the session.
+
+<br clear="left">
+
+- **Permissions:** `session:read` (read the session it was started from), `llm:invoke` (call
+  the model chosen for Skiller in **Settings → Models by feature**), `override:skill.text`
+  (propose a new version of a skill's text).
+- **Runs:** as a background job of up to 10 minutes, with two to four model calls.
+- **Read more:** [`skiller/README.md`](skiller/README.md) ·
+  [wiki: Plugin-Skiller](https://github.com/samugit83/redamon/wiki/Plugin-Skiller)
 
 ## Layout
 
 ```
 README.md  LICENSE  .gitignore
 .github/CODEOWNERS            every plugin folder, tools/, .github/ and the catalog need the owner's review
-.github/workflows/            ci.yml, release.yml, revoke.yml, catalog-resign.yml
+.github/workflows/            ci.yml, release.yml, revoke.yml, catalog-resign.yml, listings.yml
 .platform-sdk/<version>/      synced copy of the platform contract, one folder per platform version
-tools/                        validate, pack, catalog, sign, gen_key, semver, sync_sdk, run_tests
-catalog.json, catalog.json.sig   written only by the release, revoke and re-sign workflows, never by hand
+tools/                        validate, pack, catalog, listing, sign, gen_key, semver, sync_sdk, run_tests
+catalog.json, catalog.json.sig   written only by the release, revoke, re-sign and listings workflows, never by hand
 <plugin>/                     one folder per plugin
 ```
 
@@ -29,6 +54,8 @@ A plugin folder:
   plugin.json      the manifest: the whole contract with the platform
   README.md        what the plugin does, the data it reads and stores, its limits
   CHANGELOG.md     one "## [x.y.z]" section per released version
+  listing.json     optional: the icon and documentation link of its card in RedAmon (never packed)
+  icon.jpg         optional: the icon listing.json names; or icon.png, icon.webp (never packed)
   engine/          Python actions (engine/__init__.py, engine/<module>.py)
   vendor/          optional: bundled pure-Python dependencies
   ui/              optional: screen descriptions (JSON) drawn by RedAmon
@@ -40,6 +67,17 @@ A plugin folder:
 Plugins never import from each other. Plugin code may import only the Python standard library,
 `redamon_plugin_sdk` and its own `vendor/` folder: the Runner starts each worker with
 `python -I -S`, so nothing else exists at run time. `tools/validate.py` refuses anything else.
+
+The listing is how RedAmon's Plugins page shows the plugin, so it is kept out of the manifest
+(a new manifest field would make an older RedAmon refuse the plugin) and out of the archive: the
+catalog carries it. `listing.json` takes two keys, both optional, and nothing else: `icon`, the
+name of `icon.jpg`, `icon.png` or `icon.webp` in the plugin folder, whose bytes must be that
+format, at most 256 KiB (make it square: RedAmon crops it to fill a square); and `docsUrl`, an
+`https://` link of at most 500 characters. `tools/validate.py` checks both, and refuses an icon
+file that `listing.json` does not name. The catalog entry gets `docsUrl` and an `icon` of
+`{url, sha256, size, type}`, where `url` is the raw file on `master`; RedAmon fetches it and
+shows it only while its sha256 matches, so a changed icon shows again once the catalog is
+refreshed ("Changing a plugin's listing" below).
 
 ## The platform contract (`.platform-sdk/`)
 
@@ -63,9 +101,10 @@ All tools are Python 3.11 scripts. Run them in a container, as the tests do (see
 
 | Tool | Does |
 |---|---|
-| `tools/validate.py <plugin>` | Checks the manifest and every `ui/*.json` against the platform schemas plus the rules a schema cannot hold (contributions name declared actions, `llm` needs `llm:invoke`, a core screen needs its permission, screen depth), the folder layout, that each entry is an `async def`, the imports (standard library, SDK, own `vendor/` only; never another plugin), the `platform` range, and a `CHANGELOG.md` section for the manifest version. |
-| `tools/pack.py <plugin>` | Writes `dist/<id>-<version>.tar.gz`: a deterministic POSIX ustar archive (sorted entries, zero times and owners, modes 0644/0755, no links) without `tests/`, `eval/` or caches. Two packs of one folder are byte-identical. Prints the sha256 and size. |
-| `tools/catalog.py add-release\|revoke\|unrevoke\|resign\|local` | Adds a release to `catalog.json` (fields from the manifest and the archive); lists a released version in `revoked` with its reason, or lifts that; raises only the serial so the unchanged catalog can be signed again; or writes a one-release catalog for an offline install. `serial` only grows. A catalog has no expiry. |
+| `tools/validate.py <plugin>` | Checks the manifest and every `ui/*.json` against the platform schemas plus the rules a schema cannot hold (contributions name declared actions, `llm` needs `llm:invoke`, a core screen needs its permission, screen depth), the folder layout, that each entry is an `async def`, the imports (standard library, SDK, own `vendor/` only; never another plugin), the `platform` range, a `CHANGELOG.md` section for the manifest version, and the listing. |
+| `tools/pack.py <plugin>` | Writes `dist/<id>-<version>.tar.gz`: a deterministic POSIX ustar archive (sorted entries, zero times and owners, modes 0644/0755, no links) without `tests/`, `eval/`, the listing or caches. Two packs of one folder are byte-identical. Prints the sha256 and size. |
+| `tools/catalog.py add-release\|revoke\|unrevoke\|resign\|listings\|local` | Adds a release to `catalog.json` (fields from the manifest and the archive, the listing from the folder); lists a released version in `revoked` with its reason, or lifts that; raises only the serial so the unchanged catalog can be signed again; refreshes every plugin's listing from its folder; or writes a one-release catalog for an offline install. `serial` only grows. A catalog has no expiry. |
+| `tools/listing.py` | The rules of a plugin's listing, shared by validate, pack and catalog (no command of its own). |
 | `tools/sign.py <catalog.json>` | Ed25519 over the exact bytes, key from the environment variable `CATALOG_SIGNING_KEY` (PEM); writes `<catalog>.sig` = `{"keyId", "sig"}`. |
 | `tools/gen_key.py --out <dir>` | A new Ed25519 key pair, written outside every git repository (`0600`); prints the public key and its key id. |
 | `tools/semver.py` | The version-range grammar of the platform (`>=1.0.0 <2.0.0`: comparators `>= > <= < =` on full `x.y.z`), held equal to RedAmon's by the shared cases. |
@@ -95,14 +134,15 @@ tag, `release.yml` runs two jobs:
    tests on the lowest synced platform version its range accepts, and packs only that folder
    (deterministic archive, sha256);
 2. **publish**, in the protected environment `release`, **after a reviewer approves**: creates the
-   GitHub release with the archive, adds it to `catalog.json`, increments `serial`, signs the
-   catalog, and commits `catalog.json` and `catalog.json.sig` to `master` as
-   `github-actions[bot]` ("chore(catalog): add <plugin> <version>").
+   GitHub release with the archive, adds it to `catalog.json` (with the plugin's listing as it is
+   on `master`), increments `serial`, signs the catalog, and commits `catalog.json` and
+   `catalog.json.sig` to `master` as `github-actions[bot]` ("chore(catalog): add <plugin>
+   <version>").
 
-Every job that signs (release, revoke, re-sign) runs in one concurrency group (`catalog`), so two
-never race on the catalog. GitHub keeps only one waiting run per group: a third run cancels the
-one still waiting, which shows as "cancelled" and is simply re-run. Every action in the workflows
-is pinned to a full commit SHA. The first release,
+Every job that signs (release, revoke, re-sign, listings) runs in one concurrency group
+(`catalog`), so two never race on the catalog. GitHub keeps only one waiting run per group: a
+third run cancels the one still waiting, which shows as "cancelled" and is simply re-run. Every
+action in the workflows is pinned to a full commit SHA. The first release,
 `skiller-v1.0.0`, ran this way on 2026-10-11: build 20 s, then the publish job waited for the
 approval and took 13 s; the raw catalog URL served the new catalog 17 s after the bot's commit.
 
@@ -185,6 +225,24 @@ no monthly approval. **Catalog re-sign** (Actions → Run workflow, then approve
 unchanged catalog again with `serial` + 1. It is needed only after a key rotation (RedAmon's
 `docs/readmes/README.PLUGINS.md` §6.4), so the catalog carries the new key at once.
 
+### Changing a plugin's listing
+
+A release copies its plugin's listing from `master` into the catalog. A listing changed between
+releases (a new icon, another documentation link) reaches RedAmon through **Catalog listings**:
+
+1. Change `listing.json` or the icon, with `tools/validate.py <plugin>` passing; push `master`
+   and wait for CI to be green. No new version is needed: the archive does not hold the listing.
+2. Actions → **Catalog listings** → **Run workflow** on `master`, then approve the `release`
+   deployment. It refreshes every plugin's `icon` and `docsUrl` from its folder, raises
+   `serial`, signs, and commits "chore(catalog): refresh the listings". A run that would change
+   nothing fails before anything is signed.
+3. `git pull` to get the bot's commit.
+
+Run it right after pushing a new icon: until then the raw file no longer matches the sha256 the
+catalog pins, and every RedAmon shows the card without an icon. Locally, the same change is
+`python tools/catalog.py listings --repo samugit83/redamon-plugins`, but only the workflow can
+sign it.
+
 ### Repository settings
 
 These are set in the GitHub UI by the owner; the token used for pushes cannot change them.
@@ -224,6 +282,9 @@ python tools/catalog.py local <plugin> --archive dist/<plugin>-<version>.tar.gz 
 CATALOG_SIGNING_KEY="$(cat ~/.config/redamon-plugins/dev/signing-key.pem)" python tools/sign.py dist/catalog.json
 ```
 
+With `--url` alone the local catalog lists no icon (the tool warns); add
+`--listing-repo <owner>/redamon-plugins` to point it at the raw file on `master`.
+
 Then, on the RedAmon host: set `PLUGINS_ENABLED=true` and
 `PLUGINS_EXTRA_TRUSTED_KEYS=[{"keyId":"…","publicKey":"…"}]` (the values `gen_key.py` printed)
 in `.env`, run `./redamon.sh up`, and use **Install from file** on the Plugins page with the
@@ -243,8 +304,9 @@ remove it when you are done. (Run these commands in `python:3.11-slim` too, for 
    `## [1.0.0]`.
 3. Write tests with `FakeSdk` and `ScriptedLlm`; `tools/run_tests.sh <plugin>` and
    `tools/validate.py <plugin>` must pass.
-4. Add the line `/<plugin>/ @samugit83` to `.github/CODEOWNERS`, and a row to the table at the
-   top of this README.
+4. Add the line `/<plugin>/ @samugit83` to `.github/CODEOWNERS`, and a block for the plugin
+   under "The plugins" at the top of this README, in the shape of the ones there. Optional: a
+   listing (`listing.json` and an icon, "Layout" above), shown on the plugin's card in RedAmon.
 5. Optional, recommended: try it on a local RedAmon with a development key ("Developing a plugin
    against a local RedAmon" above).
 6. Push `master`, then follow "Releasing a new version of a plugin" from step 8: tag

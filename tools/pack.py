@@ -8,8 +8,9 @@ The archive is what RedAmon's strict reader accepts (webapp/src/lib/plugins/arch
 TD-12): POSIX ustar, regular files and folders only, everything under one top folder named
 after the plugin id. It is deterministic, so two packs of one folder are byte-identical and a
 release's sha256 can be reproduced from its tag: entries sorted, times and owners zero, modes
-0644 for files and 0755 for folders, gzip header without a name or time. Left out: `tests/`
-and `eval/` at the top of the plugin, and caches anywhere. A symbolic link is refused.
+0644 for files and 0755 for folders, gzip header without a name or time. Left out: `tests/`,
+`eval/` and the listing (`listing.json` and its icon, which only the catalog uses) at the top of
+the plugin, and caches anywhere. A symbolic link is refused.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ import stat
 import sys
 import tarfile
 
-EXCLUDED_TOP = {"tests", "eval"}
+import listing
+
+EXCLUDED_TOP = {"tests", "eval"} | listing.FILES
 CACHE_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 # archive.ts refuses more entries than this.
 MAX_ENTRIES = 2000

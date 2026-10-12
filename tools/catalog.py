@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 """Writes the plugin catalog RedAmon installs from (README.PLUGINS.md §6.2).
 
-    python tools/catalog.py add-release <plugin> --archive <tar.gz> (--url URL | --repo OWNER/NAME)
+    python tools/catalog.py add-release <plugin> --archive <tar.gz> (--url URL [--listing-repo OWNER/NAME] | --repo OWNER/NAME) [--ref master]
     python tools/catalog.py revoke <plugin-id> <version> --reason TEXT
     python tools/catalog.py unrevoke <plugin-id> <version>
     python tools/catalog.py resign
-    python tools/catalog.py local <plugin> --archive <tar.gz> (--url URL | --repo OWNER/NAME) --out dist/catalog.json
+    python tools/catalog.py listings --repo OWNER/NAME [--ref master]
+    python tools/catalog.py local <plugin> --archive <tar.gz> (--url URL [--listing-repo OWNER/NAME] | --repo OWNER/NAME) [--ref master] --out dist/catalog.json
 
 `add-release` reads `catalog.json` (or starts an empty one) and adds or replaces the plugin's
 release with fields taken from the archive and the manifest inside it (not the folder, which may
 already be a later version when a release is re-run). `revoke` lists a released version
 in `revoked` with the reason RedAmon shows, which stops that version on every installation;
 `unrevoke` lifts it. `resign` changes nothing but the serial, so the unchanged catalog can be
-signed again (with a new key, after a rotation). Each raises `serial` by one. `local` writes a
+signed again (with a new key, after a rotation). `listings` refreshes the listing of every
+plugin in the catalog whose folder is here. Each raises `serial` by one. `local` writes a
 one-release catalog for an offline install; its `serial` is the clock, because RedAmon keeps the
 highest serial it accepted per signing key and refuses a lower one as a replay.
+
+A plugin's listing (`listing.json` and its icon, tools/listing.py) is the entry's `icon` and
+`docsUrl`: presentation for RedAmon's Plugins page, never in the manifest or the archive. It
+comes from the folder, not the archive, because it is how the plugin is shown now, whatever
+version is released; a folder without one drops the entry's listing. The icon is served from the
+raw file on `--ref` of the repository (`--repo`, or `--listing-repo` with `--url`), which can
+change after signing, so the entry pins its sha256: RedAmon shows the icon only while the bytes
+match, and a changed icon needs `listings`. Without a repository the entry has no icon.
 
 A catalog has no expiry (the owner's decision of 2026-10-11): nothing writes `expires`, and the
 first write after it drops the field from a catalog signed before. Every result is checked
@@ -35,14 +45,20 @@ import tarfile
 
 import jsonschema
 
+import listing
 import semver
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = ROOT / "catalog.json"
+# The branch the catalog workflows commit to: an icon URL names it.
+DEFAULT_REF = "master"
 # The same id and version shapes as the platform's catalog schema (webapp ids.ts, semver.ts).
 PLUGIN_ID_RE = re.compile(r"[a-z][a-z0-9-]{1,39}")
 # Counted in UTF-16 units, as RedAmon's schema (JavaScript) counts a string: an emoji is two.
 REASON_MAX_UTF16 = 500
+REPO_RE = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+# Path segments that cannot start with a dot, so a ref never walks out of the repository's URL.
+REF_RE = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._-]*)*")
 
 
 class CatalogError(Exception):
@@ -121,6 +137,35 @@ def release_url(repo: str, plugin_id: str, version: str) -> str:
     return f"https://github.com/{repo}/releases/download/{plugin_id}-v{version}/{plugin_id}-{version}.tar.gz"
 
 
+def icon_url(repo: str, ref: str, plugin_id: str, name: str) -> str:
+    if not isinstance(repo, str) or not REPO_RE.fullmatch(repo):
+        raise CatalogError(f"{repo!r} is not a GitHub repository OWNER/NAME")
+    if not isinstance(ref, str) or not REF_RE.fullmatch(ref):
+        raise CatalogError(f"{ref!r} is not a branch or tag name")
+    return f"https://raw.githubusercontent.com/{repo}/{ref}/{plugin_id}/{name}"
+
+
+def _listing(plugin, plugin_id: str, repo, ref: str) -> dict:
+    """The entry's `icon` and `docsUrl` from the plugin folder's listing.json; {} without one."""
+    plugin = pathlib.Path(plugin)
+    try:
+        given = listing.read(plugin)
+    except listing.ListingError as e:
+        raise CatalogError(f"{plugin_id}: {e}") from None
+    fields = {}
+    name = given.get("icon")
+    if name is not None and repo is None:
+        print(f"catalog: warning: {plugin_id} is listed without its icon: the icon URL needs --repo or --listing-repo",
+              file=sys.stderr)
+    elif name is not None:
+        data = (plugin / name).read_bytes()
+        fields["icon"] = {"url": icon_url(repo, ref, plugin_id, name), "sha256": hashlib.sha256(data).hexdigest(),
+                          "size": len(data), "type": listing.ICON_TYPES[name]}
+    if "docsUrl" in given:
+        fields["docsUrl"] = given["docsUrl"]
+    return fields
+
+
 def _release(m: dict, archive: pathlib.Path, url: str) -> dict:
     if not isinstance(url, str) or not url.startswith("https://"):
         raise CatalogError(f"url must be an https URL (RedAmon downloads archives over https only): {url!r}")
@@ -136,14 +181,19 @@ def _release(m: dict, archive: pathlib.Path, url: str) -> dict:
     }
 
 
-def _with_release(doc: dict, m: dict, release: dict) -> dict:
+def _entry(about: dict, fields: dict, releases: list) -> dict:
+    """A plugin's entry, key by key in the order RedAmon's catalog lists them."""
+    return {"id": about["id"], "displayName": about["displayName"], "description": about["description"],
+            **{k: fields[k] for k in listing.KEYS if k in fields}, "releases": releases}
+
+
+def _with_release(doc: dict, m: dict, release: dict, fields: dict) -> dict:
     plugins = [p for p in doc.get("plugins", []) if p.get("id") != m["id"]]
     previous = next((p for p in doc.get("plugins", []) if p.get("id") == m["id"]), None)
     releases = [r for r in (previous or {}).get("releases", []) if r.get("version") != release["version"]]
     releases.append(release)
     releases.sort(key=lambda r: semver.parse_version(r["version"]))
-    plugins.append({"id": m["id"], "displayName": m["displayName"], "description": m["description"],
-                    "releases": releases})
+    plugins.append(_entry(m, fields, releases))
     plugins.sort(key=lambda p: p["id"])
     return {**doc, "plugins": plugins}
 
@@ -173,11 +223,12 @@ def _target(doc: dict, plugin_id: str, version: str) -> None:
         raise CatalogError(f"{plugin_id} {version} is not in the catalog: only a released version can be revoked")
 
 
-def add_release(catalog_path, plugin, *, archive, url, expect_version=None) -> dict:
+def add_release(catalog_path, plugin, *, archive, url, expect_version=None, repo=None, ref=DEFAULT_REF) -> dict:
+    """`repo` (OWNER/NAME) serves the icon; without it the entry has no icon."""
     catalog_path = pathlib.Path(catalog_path)
     doc = _read(catalog_path) if catalog_path.exists() else _empty()
     m = _released_manifest(plugin, archive, expect_version)
-    doc = _with_release(doc, m, _release(m, archive, url))
+    doc = _with_release(doc, m, _release(m, archive, url), _listing(plugin, m["id"], repo, ref))
     out = _ordered(doc, doc["serial"] + 1)
     _write(catalog_path, out)
     return out
@@ -223,10 +274,28 @@ def resign(catalog_path) -> dict:
     return out
 
 
-def local(out_path, plugin, *, archive, url, now=None, serial=None) -> dict:
+def listings(catalog_path, *, repo: str, ref: str = DEFAULT_REF, root=ROOT) -> dict:
+    """Every entry's `icon` and `docsUrl` again from its plugin folder under `root` (this
+    repository), without a release. An entry whose folder is not there is left as it is."""
+    catalog_path = pathlib.Path(catalog_path)
+    root = pathlib.Path(root)
+    doc = _read(catalog_path)
+    before = doc.get("plugins", [])
+    plugins = []
+    for p in before:
+        folder = root / p["id"]
+        plugins.append(_entry(p, _listing(folder, p["id"], repo, ref), p["releases"]) if folder.is_dir() else p)
+    if plugins == before:
+        raise CatalogError("every listing already matches its plugin folder: nothing to change")
+    out = _ordered({**doc, "plugins": plugins}, doc["serial"] + 1)
+    _write(catalog_path, out)
+    return out
+
+
+def local(out_path, plugin, *, archive, url, now=None, serial=None, repo=None, ref=DEFAULT_REF) -> dict:
     now = _now(now)
     m = _released_manifest(plugin, archive)
-    doc = _with_release(_empty(), m, _release(m, archive, url))
+    doc = _with_release(_empty(), m, _release(m, archive, url), _listing(plugin, m["id"], repo, ref))
     out = _ordered(doc, int(now.timestamp()) if serial is None else int(serial))
     _write(pathlib.Path(out_path), out)
     return out
@@ -248,7 +317,9 @@ def main(argv=None) -> int:
         p.add_argument("--archive", type=pathlib.Path, required=True)
         where = p.add_mutually_exclusive_group(required=True)
         where.add_argument("--url")
-        where.add_argument("--repo", help="OWNER/NAME: the GitHub release URL is derived from it")
+        where.add_argument("--repo", help="OWNER/NAME: the GitHub release URL and the icon URL are derived from it")
+        p.add_argument("--listing-repo", default=None, help="with --url: OWNER/NAME that serves the icon")
+        p.add_argument("--ref", default=DEFAULT_REF, help="the branch that serves the icon")
         if name == "add-release":
             p.add_argument("--catalog", type=pathlib.Path, default=DEFAULT_CATALOG)
             p.add_argument("--expect-version", default=None, help="refuse an archive of another version")
@@ -267,11 +338,22 @@ def main(argv=None) -> int:
     p.add_argument("--catalog", type=pathlib.Path, default=DEFAULT_CATALOG)
     p = sub.add_parser("resign", help="serial + 1 only, to sign the unchanged catalog again")
     p.add_argument("--catalog", type=pathlib.Path, default=DEFAULT_CATALOG)
+    p = sub.add_parser("listings", help="refresh every entry's icon and docsUrl from its plugin folder")
+    p.add_argument("--repo", required=True, help="OWNER/NAME that serves the icons")
+    p.add_argument("--ref", default=DEFAULT_REF, help="the branch that serves the icons")
+    p.add_argument("--catalog", type=pathlib.Path, default=DEFAULT_CATALOG)
+    p.add_argument("--root", type=pathlib.Path, default=ROOT, help=argparse.SUPPRESS)
 
     args = ap.parse_args(argv)
+    if getattr(args, "listing_repo", None) and args.repo:
+        ap.error("--listing-repo goes with --url: --repo already names the repository")
     try:
         if args.cmd == "resign":
             path, doc, what = args.catalog, resign(args.catalog), "re-signed"
+        elif args.cmd == "listings":
+            path = args.catalog
+            doc = listings(path, repo=args.repo, ref=args.ref, root=args.root)
+            what = "refreshed the listings"
         elif args.cmd == "revoke":
             path = args.catalog
             doc = revoke(path, args.plugin_id, args.version, reason=args.reason)
@@ -283,12 +365,15 @@ def main(argv=None) -> int:
         else:
             m = _released_manifest(args.plugin, args.archive, getattr(args, "expect_version", None))
             url = args.url or release_url(args.repo, m["id"], m["version"])
+            repo = args.listing_repo or args.repo
             if args.cmd == "add-release":
                 path = args.catalog
-                doc = add_release(path, args.plugin, archive=args.archive, url=url, expect_version=args.expect_version)
+                doc = add_release(path, args.plugin, archive=args.archive, url=url, expect_version=args.expect_version,
+                                  repo=repo, ref=args.ref)
             else:
                 path = args.out
-                doc = local(path, args.plugin, archive=args.archive, url=url, now=_parse_now(args.now), serial=args.serial)
+                doc = local(path, args.plugin, archive=args.archive, url=url, now=_parse_now(args.now), serial=args.serial,
+                            repo=repo, ref=args.ref)
             what = f"{m['id']} {m['version']}"
     except (CatalogError, OSError, ValueError, KeyError) as e:
         print(f"catalog: {e}", file=sys.stderr)

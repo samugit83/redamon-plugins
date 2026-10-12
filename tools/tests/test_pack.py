@@ -15,7 +15,7 @@ import sys
 import pytest
 
 import pack
-from support import ROOT
+from support import DOCS_URL, ICONS, ROOT
 
 BLOCK = 512
 
@@ -101,6 +101,19 @@ def test_tests_eval_and_caches_are_left_out(good_plugin, tmp_path):
     assert "good/plugin.json" in names and "good/engine/main.py" in names and "good/vendor/tinylib/__init__.py" in names
     for banned in ("good/tests/", "good/eval/", "__pycache__", ".pyc", ".pytest_cache"):
         assert not [n for n in names if banned in n], banned
+
+
+def test_the_listing_is_left_out_and_changes_no_byte(good_plugin, tmp_path):
+    # Presentation for the catalog only: an archive released before a plugin had a listing must
+    # stay reproducible from a later checkout.
+    before = pack.pack(good_plugin, tmp_path / "a")
+    (good_plugin / "listing.json").write_text(json.dumps({"icon": "icon.png", "docsUrl": DOCS_URL}))
+    for name, data in ICONS.items():
+        (good_plugin / name).write_bytes(data)
+    after = pack.pack(good_plugin, tmp_path / "b")
+    assert after["sha256"] == before["sha256"]
+    names = [r[0] for r in strict_read((tmp_path / "b" / "good-1.2.0.tar.gz").read_bytes(), "good")]
+    assert not [n for n in names if n.split("/", 1)[1] in ("listing.json", *ICONS)]
 
 
 def test_symlinks_are_refused(good_plugin, tmp_path):

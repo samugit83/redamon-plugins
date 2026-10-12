@@ -40,3 +40,13 @@ def good_plugin(tmp_path) -> pathlib.Path:
     dest = tmp_path / "repo" / "good"
     shutil.copytree(FIXTURES / "plugins" / "good", dest)
     return dest
+
+
+@pytest.fixture
+def listed_plugin(good_plugin) -> pathlib.Path:
+    """The valid fixture plugin with a listing: a PNG icon and a docs link."""
+    from support import DOCS_URL, ICONS
+
+    (good_plugin / "icon.png").write_bytes(ICONS["icon.png"])
+    (good_plugin / "listing.json").write_text(json.dumps({"icon": "icon.png", "docsUrl": DOCS_URL}), encoding="utf-8")
+    return good_plugin

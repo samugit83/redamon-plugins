@@ -5,11 +5,12 @@ import re
 import pytest
 import yaml
 
+import catalog
 from support import ROOT
 
 WORKFLOWS = ROOT / ".github" / "workflows"
-NAMES = ("ci.yml", "release.yml", "catalog-resign.yml", "revoke.yml")
-SIGNING = ("release.yml", "catalog-resign.yml", "revoke.yml")
+NAMES = ("ci.yml", "release.yml", "catalog-resign.yml", "revoke.yml", "listings.yml")
+SIGNING = ("release.yml", "catalog-resign.yml", "revoke.yml", "listings.yml")
 PINNED_USES = re.compile(r"^\s*-?\s*uses:\s*([\w.-]+/[\w./-]+)@([0-9a-f]{40})\s+#\s*v\d+\.\d+\.\d+\s*$")
 
 
@@ -132,6 +133,16 @@ def test_resign_is_by_hand_only():
     assert "tools/catalog.py resign" in scripts
 
 
+def test_listings_is_by_hand_only():
+    wf = _load("listings.yml")
+    assert set(_triggers(wf)) == {"workflow_dispatch"}
+    assert _triggers(wf)["workflow_dispatch"] is None, "no input reaches the catalog"
+    scripts = "\n".join(step.get("run", "") for step in _signing_job(wf)["steps"])
+    # The icon URLs name the repository the workflow runs in.
+    assert 'tools/catalog.py listings --repo "$GITHUB_REPOSITORY"' in scripts
+    assert 'git commit -m "chore(catalog): refresh the listings"' in scripts
+
+
 def test_revoke_is_by_hand_with_its_inputs_passed_through_env():
     wf = _load("revoke.yml")
     triggers = _triggers(wf)
@@ -196,3 +207,5 @@ def test_every_workflow_uses_the_default_branch():
         assert f"git push origin HEAD:{DEFAULT_BRANCH}" in scripts and f"git rebase origin/{DEFAULT_BRANCH}" in scripts
     for name in NAMES:
         assert not re.search(r"\bmain\b", (WORKFLOWS / name).read_text(encoding="utf-8")), f"{name} names main"
+    # An icon is served from the raw file on this branch, and the workflows leave --ref unset.
+    assert catalog.DEFAULT_REF == DEFAULT_BRANCH

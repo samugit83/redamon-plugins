@@ -1,11 +1,11 @@
 {
   "catalogVersion": 1,
-  "serial": 2,
+  "serial": 3,
   "plugins": [
     {
       "id": "skiller",
       "displayName": "Skiller",
-      "description": "Learns from an agent chat session and proposes a better, session-agnostic version of the built-in skill it used. Nothing changes until a person approves it.",
+      "description": "Learns from an agent chat session and proposes a better, session-agnostic version of a skill it used. Nothing changes until a person approves it.",
       "icon": {
         "url": "https://raw.githubusercontent.com/samugit83/redamon-plugins/master/skiller/icon.jpg",
         "sha256": "e4d591add80435def809a308b168273f941a6c68d187eff9d6c419fdbbed6e43",
@@ -25,6 +25,20 @@
             "session:read",
             "llm:invoke",
             "override:skill.text"
+          ]
+        },
+        {
+          "version": "1.1.0",
+          "platform": ">=1.1.0 <2.0.0",
+          "dataVersion": 1,
+          "url": "https://github.com/samugit83/redamon-plugins/releases/download/skiller-v1.1.0/skiller-1.1.0.tar.gz",
+          "sha256": "801afb494b79d793dde51ac1f1e9a34b6878750402f5d23759764c047a4f4391",
+          "size": 44201,
+          "permissions": [
+            "session:read",
+            "llm:invoke",
+            "override:skill.text",
+            "override:user_skill.text"
           ]
         }
       ]

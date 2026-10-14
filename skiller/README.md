@@ -57,8 +57,9 @@ same.
   findings stay readable**, because a session without them cannot be analysed.
 - The skill's text and RedAmon's limits, through `override.get`: for a built-in skill its factory
   text and the version that applies; for your own skill its current text. RedAmon gives Skiller
-  only your own skills that this session used, and never one whose text holds a key or token
-  (a private key, a JWT, an API token; remove it from the skill to use Skiller on it).
+  only your own skills that this session used, and never one whose name, description or text
+  holds a key or token (a private key, a JWT, an API token; remove it from the skill to use
+  Skiller on it).
 - The model the user chose for Skiller in **Settings → Models by feature**; calls go through
   RedAmon and count against Skiller's daily limit, not the user's.
 
@@ -111,8 +112,8 @@ new `.md`.
 - Saving needs Skiller enabled and at the version that made the proposal; a proposal from an older
   or unavailable version is run again, not saved.
 - If the plugin catalog revokes the Skiller version that proposed a skill you saved, RedAmon turns
-  that skill off everywhere and quarantines it until you read it and release it in Global
-  Settings.
+  that skill off everywhere, and every version saved from it since, and quarantines them until you
+  read them and release them in Global Settings.
 
 ## Limits
 

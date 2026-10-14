@@ -39,8 +39,8 @@ nothing of the session.
   the model chosen for Skiller in **Settings → Models by feature**), `override:skill.text`
   (propose a new version of a built-in skill's text), `override:user_skill.text` (propose a new
   version of one of your own skills that the session used, saved as a new skill when approved).
-- **Needs:** RedAmon plugin platform 1.1.0 for Skiller 1.1.0; RedAmon 1.0.0 instances keep
-  Skiller 1.0.0 (built-in skills only).
+- **Needs:** RedAmon plugin platform 1.1.0 for Skiller 1.1.0; installations on plugin platform
+  1.0.0 keep Skiller 1.0.0 (built-in skills only).
 - **Runs:** as a background job of up to 10 minutes, with two to four model calls.
 - **Read more:** [`skiller/README.md`](skiller/README.md) ·
   [wiki: Plugin-Skiller](https://github.com/samugit83/redamon/wiki/Plugin-Skiller)

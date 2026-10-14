@@ -1,16 +1,19 @@
 # Skiller evaluation
 
 How well Skiller turns one session into a better playbook, measured without real target data.
-Three synthetic sessions (`sessions/`), one per skill (`sql_injection`, `path_traversal`, `xss`),
-each with four planted mistakes and a list of planted identifiers. The harness runs Skiller on
-each through a local RedAmon, exactly as a person would from the chat, and scores the proposal.
-Nothing here is packed into the plugin.
+Four synthetic sessions (`sessions/`), each with four planted mistakes and a list of planted
+identifiers: three on built-in skills (`sql_injection`, `path_traversal`, `xss`) and, since
+Skiller 1.1.0, `user_skill` on one of the person's own skills. The harness runs Skiller on each
+through a local RedAmon, exactly as a person would from the chat (picking the skill in RedAmon's
+skill picker), and scores the proposal. Nothing here is packed into the plugin.
 
 ## Run
 
 Prerequisites, on the RedAmon host:
 
-1. Skiller installed and enabled (the plugin platform is part of every RedAmon).
+1. Skiller installed and enabled (the plugin platform is part of every RedAmon). For the
+   `user_skill` session: Skiller 1.1.0 on RedAmon plugin platform 1.1.0, granted "Propose versions
+   of your own skills".
 2. A user who owns a project, with a model chosen for **Skiller** in Settings → Models by feature.
    Any provider works; for a dry run of the harness itself, use the stub model of RedAmon's
    `testing/e2e/scripts/stub-llm-server.mjs` (a custom OpenAI-compatible provider).
@@ -25,9 +28,11 @@ docker run --rm --network host -u "$(id -u):$(id -g)" \
 ```
 
 For each session the harness creates a new conversation in the project (the internal key from
-`.env`), starts *Improve skill from this session* (a session cookie signed with `AUTH_SECRET`
-from `.env`), follows the job, reads the proposal's review, scores it, and deletes the proposal
-and the conversation (`--keep` keeps them, to look at them in the review window). The two
+`.env`), starts *Improve skill from this session* with the session's skill as the pick (a session
+cookie signed with `AUTH_SECRET` from `.env`), follows the job, reads the proposal's review,
+scores it, and deletes the proposal and the conversation (`--keep` keeps them, to look at them in
+the review window). For `user_skill` it first uploads the session's skill as one of the user's
+own (its `userSkill`) and deletes it at the end; the user must have room for one more skill. The two
 secrets are read from the file and never printed. The exit code is 1 when any proposal leaked a
 planted identifier.
 

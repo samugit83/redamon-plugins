@@ -2,6 +2,10 @@
 
 One section per run (README.md, "Run"). Leaks must be 0 in every run.
 
+**Skiller 1.1.0.** The runs below are of Skiller 1.0.0 on the three built-in sessions. 1.1.0 keeps
+the built-in prompts byte for byte (a test pins them), so those results stand for it. It adds the
+`user_skill` session, on one of the person's own skills: its real-model run is still to do.
+
 ## Real models (experiment E6)
 
 ### DeepSeek `deepseek/deepseek-flash` (2026-10-11)

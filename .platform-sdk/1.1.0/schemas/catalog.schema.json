@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "catalogVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "serial": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "plugins": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,39}(?!\\n)$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "releases": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(?!\\n)$"
+                },
+                "platform": {
+                  "type": "string",
+                  "pattern": "^ *(>=|<=|>|<|=)(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})( +(>=|<=|>|<|=)(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})){0,3} *(?!\\n)$"
+                },
+                "dataVersion": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "url": {
+                  "type": "string",
+                  "pattern": "^https?:\\/\\/"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}(?!\\n)$"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "permissions": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9.:_-]{0,63}(?!\\n)$"
+                  }
+                }
+              },
+              "required": [
+                "version",
+                "platform",
+                "dataVersion",
+                "url",
+                "sha256",
+                "permissions"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "description",
+          "releases"
+        ]
+      }
+    },
+    "revoked": {
+      "default": [],
+      "maxItems": 1000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,39}(?!\\n)$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(?!\\n)$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "reason"
+        ]
+      }
+    }
+  },
+  "required": [
+    "catalogVersion",
+    "serial",
+    "plugins"
+  ],
+  "title": "RedAmon plugin catalog (catalog.json)",
+  "description": "Generated from webapp/src/lib/plugins/schemas/catalog.ts for platform 1.1.0. Do not edit by hand."
+}

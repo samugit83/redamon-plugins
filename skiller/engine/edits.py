@@ -7,7 +7,9 @@ Limits, each refusal collected with its reason for the repair round:
 - a part gains at most max(1,500, 25 % of the part) characters over all its edits;
 - a replacement removes at most 600 characters;
 - a part stays within its platform limit, and the whole skill within `skillMaxChars`, so
-  successive versions can never grow past the platform's bound (RV-05).
+  successive versions can never grow past the platform's bound (RV-05). `measure` is how the
+  platform counts that limit: Python characters for a built-in skill (the agent validates
+  it), UTF-16 code units for a user skill (the webapp's `.length`), passed as js_length.
 """
 
 from __future__ import annotations
@@ -75,7 +77,7 @@ def _append(text: str, new: str) -> tuple:
     return body + "\n" + block + trailing, "\n" + block
 
 
-def apply(current: dict, edits: list, *, limits: dict) -> Result:
+def apply(current: dict, edits: list, *, limits: dict, measure=len) -> Result:
     parts = dict(current)
     part_limits = (limits or {}).get("parts") or {}
     skill_max = (limits or {}).get("skillMaxChars")
@@ -124,10 +126,10 @@ def apply(current: dict, edits: list, *, limits: dict) -> Result:
             refuse(f"the edits add more than {cap} characters to part {pid}")
             continue
         limit = part_limits.get(pid)
-        if isinstance(limit, int) and len(updated) > limit:
-            refuse(f"part {pid} would be {len(updated)} characters; the limit for part {pid} is {limit}")
+        if isinstance(limit, int) and measure(updated) > limit:
+            refuse(f"part {pid} would be {measure(updated)} characters; the limit for part {pid} is {limit}")
             continue
-        total = sum(len(t) for p, t in parts.items() if p != pid) + len(updated)
+        total = sum(measure(t) for p, t in parts.items() if p != pid) + measure(updated)
         if isinstance(skill_max, int) and total > skill_max:
             refuse(f"the whole skill would be {total} characters; its limit is {skill_max}")
             continue

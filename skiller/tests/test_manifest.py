@@ -35,15 +35,19 @@ def test_manifest_matches_the_platform_schema_of_every_synced_version_it_accepts
 
 def test_the_contract_as_designed():
     m = _manifest()
-    assert (m["id"], m["version"], m["displayName"], m["dataVersion"]) == ("skiller", "1.0.0", "Skiller", 1)
-    assert m["platform"] == ">=1.0.0 <2.0.0"
-    assert m["permissions"] == ["session:read", "llm:invoke", "override:skill.text"]
+    assert (m["id"], m["version"], m["displayName"], m["dataVersion"]) == ("skiller", "1.1.0", "Skiller", 1)
+    # The skill picker and user_skill.text are platform 1.1.0; the catalog keeps 1.0.0 for older RedAmons.
+    assert m["platform"] == ">=1.1.0 <2.0.0"
+    assert m["permissions"] == ["session:read", "llm:invoke", "override:skill.text", "override:user_skill.text"]
     assert m["actions"] == [{"id": "analyze_session", "entry": "engine/main.py:analyze_session",
                              "timeoutSeconds": 600, "async": True, "llm": True}]
     assert m["contributes"] == {"chat.session.actions": [
-        {"label": "Improve skill from this session", "icon": "sparkles", "action": "analyze_session"},
+        {"label": "Improve skill from this session", "icon": "sparkles", "action": "analyze_session",
+         "pick": "session.skill"},
         {"label": "Skill versions", "icon": "history", "coreScreen": "skill.text.versions"}]}
     assert "Nothing changes until a person approves it" in m["description"]
+    # The plugin-level description is rebuilt from the newest manifest, so it must stay true for 1.0.0 too.
+    assert "built-in" not in m["description"]
 
 
 def test_the_entry_is_an_async_function_of_ctx_and_params():

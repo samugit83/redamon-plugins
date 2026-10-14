@@ -47,7 +47,7 @@ MIGRATION_STEP_MAX = 9999
 SDK_PACKAGE = "redamon_plugin_sdk"
 
 # extensionPoints.ts
-POINT_PERMISSION = {"skill.text": "override:skill.text"}
+POINT_PERMISSION = {"skill.text": "override:skill.text", "user_skill.text": "override:user_skill.text"}
 CORE_SCREEN_POINT = {"skill.text.versions": "skill.text"}
 
 # schemas/screen.ts
@@ -171,6 +171,12 @@ def _cross_field(m: dict) -> list:
         where = f"plugin.json contributes/chat.session.actions/{i}"
         if ("action" in c) == ("coreScreen" in c):
             errors.append(f"{where}: give either action or coreScreen")
+        if "pick" in c and "action" not in c:
+            errors.append(f"{where}/pick: pick goes with an action, not a core screen")
+        if c.get("pick") == "session.skill" and not (
+                has("session:read") and any(has(p) for p in POINT_PERMISSION.values())):
+            errors.append(f"{where}/pick: session.skill needs the session:read permission and "
+                          "override:skill.text or override:user_skill.text")
         if "action" in c:
             refs.append((f"{where}/action", c["action"]))
         if "coreScreen" in c:

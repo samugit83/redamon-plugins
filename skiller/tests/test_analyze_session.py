@@ -77,7 +77,8 @@ def test_proposes_a_snapshot_and_points_the_review_at_it():
     meta = cs["meta"]
     assert meta["sourceSessionId"] == "session_5e1f7c2a9b3d4e60" and meta["sessionRevision"] == 1
     assert meta["sessionPredatesActive"] is False and meta["modelUsed"] == "scripted"
-    assert meta["skillerVersion"] == "1.0.0" and meta["sourceHighWaterSeq"] > 0
+    assert meta["skillerVersion"] == "1.1.0" and meta["sourceHighWaterSeq"] > 0
+    assert meta["skillKind"] == "builtin" and "sourceSkillName" not in meta
     assert meta["guard"] == {"droppedLessons": 1, "droppedEdits": 0, "repaired": 0, "riskRefusals": 0}
     assert [lesson["id"] for lesson in meta["lessons"]] == ["L1"]
     assert "evidence" not in meta["lessons"][0]
@@ -114,7 +115,7 @@ def _running(value):
     ("session_running", {"transcript": _running(True)}),
     ("session_state_unverified", {"transcript": _running("unverified")}),
     ("session_too_short", {"name": "too_short"}),
-    ("no_builtin_skill", {"name": "user_skill_only"}),
+    ("no_skill", {"name": "unclassified"}),
     ("session_format_unsupported", {"name": "legacy_no_attack_path"}),
     ("skill_not_used", {"params": {"skillId": "xss"}}),
 ])

@@ -55,7 +55,10 @@ def note(*, summary: str, changelog, name: str, from_label: str, lessons: int, d
 
 
 def meta(*, summary: str, changelog, lessons, guard: dict, source_session_id, high_water_seq, session_revision,
-         predates_active: bool, model_used: str, skiller_version: str) -> dict:
+         predates_active: bool, model_used: str, skiller_version: str, skill_kind: str = "builtin",
+         source_skill_name: str | None = None) -> dict:
+    """Skiller's own record of the proposal. The platform keeps its own copy of what a user-skill
+    proposal was built on (its text and name), which a plugin cannot set; these are Skiller's."""
     out = {
         "summary": _cut(summary, SUMMARY_MAX_CHARS),
         "changelog": [_cut(c, CHANGE_MAX_CHARS) for c in list(changelog)[:MAX_CHANGES]],
@@ -71,7 +74,10 @@ def meta(*, summary: str, changelog, lessons, guard: dict, source_session_id, hi
         "sessionPredatesActive": bool(predates_active),
         "modelUsed": model_used,
         "skillerVersion": skiller_version,
+        "skillKind": skill_kind,
     }
+    if source_skill_name is not None:
+        out["sourceSkillName"] = _cut(source_skill_name, 200)
     while len(json.dumps(out).encode("utf-8")) > META_MAX_BYTES and (out["lessons"] or out["changelog"]):
         (out["lessons"] or out["changelog"]).pop()
     return out

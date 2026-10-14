@@ -1,5 +1,10 @@
-"""Skiller's action: from one finished chat session to a proposed, session-agnostic version of the
-built-in skill the agent used (README.md, "How it works").
+"""Skiller's action: from one finished chat session to a proposed, session-agnostic version of a
+skill the agent used: a built-in one, or one of the person's own (README.md, "How it works").
+
+The skill is the one the person picked in RedAmon's skill picker (`params.pick`, platform
+1.1.0), else `params.skillId`, else the one with the most turns. A built-in skill is proposed at
+`skill.text`, as a version of that skill; a user skill at `user_skill.text`, which RedAmon saves
+as a NEW skill of the person's when they approve it.
 
 Every refusal that needs no model comes before the first model call (running or unverified
 session, unreadable or too short, no built-in skill, five proposals already waiting), so a
@@ -10,12 +15,12 @@ plugin data: the transcript, the digest and the model's evidence live only in th
 from __future__ import annotations
 
 from redamon_plugin_sdk import PluginError
+from redamon_plugin_sdk.client import js_length
 
 from . import digest, edits, guard, identifiers, llm_json, prompts, proposal, skill_pick, templates
 from .transcript_view import TranscriptView, ensure_finished, storable
 
-SKILLER_VERSION = "1.0.0"
-POINT = "skill.text"
+SKILLER_VERSION = "1.1.0"
 MAX_PENDING = 5
 A_MAX_TOKENS = 4_000
 B_MAX_TOKENS = 8_000
@@ -26,9 +31,15 @@ RISK_RULES = ("risk_send", "risk_location", "risk_scope", "heading", "safety_rem
 
 
 class _Skill:
-    """The skill as `override.get` answered: factory parts, the version that applies, the limits."""
+    """The skill as `override.get` answered: factory parts, the version that applies, the limits.
 
-    def __init__(self, cur: dict, fallback_name: str):
+    For a user skill the one part is `body`, its "factory" text is its current text (nothing
+    else applies over it), and the limit is counted in UTF-16 code units as RedAmon counts it.
+    """
+
+    def __init__(self, cur: dict, fallback_name: str, *, kind: str = "builtin"):
+        self.kind = kind
+        self.measure = js_length if kind == "user" else len
         self.name = cur.get("displayName") or fallback_name
         self.order, self.factory, self.kinds, self.placeholders = [], {}, {}, {}
         for part in cur.get("parts") or []:
@@ -65,20 +76,37 @@ def _session_tools(view) -> list:
     return names
 
 
-async def _read_skill(sdk, skill_id: str) -> _Skill:
+async def _read_skill(sdk, ref: str) -> _Skill:
+    user = skill_pick.is_user_ref(ref)
     try:
-        cur = await sdk.override.get(POINT, skill_id)
+        cur = await sdk.override.get(skill_pick.point_of(ref), skill_pick.target_of(ref))
     except PluginError as e:
         if e.code == "invalid_target":
-            raise PluginError("no_builtin_skill", f"RedAmon does not offer {skill_pick.display_name(skill_id)} "
-                                                  f"({skill_id}) as an editable built-in skill.") from None
+            if user:
+                raise PluginError("skill_not_found", "This skill is not one Skiller can read for this session: it was "
+                                                     "deleted, quarantined, or is not yours.") from None
+            raise PluginError("skill_not_found", f"RedAmon does not offer {skill_pick.display_name(ref)} "
+                                                 f"({ref}) as an editable built-in skill.") from None
+        if e.code == "skill_contains_credentials":
+            raise PluginError("skill_contains_credentials",
+                              "This skill holds a key or token (a private key, a JWT or an API token), so RedAmon "
+                              "does not give it to Skiller. Remove it from the skill in Global Settings, then run "
+                              "Skiller again.") from None
         raise
-    return _Skill(cur, skill_pick.display_name(skill_id))
+    return _Skill(cur, skill_pick.display_name(ref), kind="user" if user else "builtin")
+
+
+def _requested(params: dict):
+    """The skill the person picked (`params.pick`), else `params.skillId`, else None."""
+    pick = params.get("pick")
+    if isinstance(pick, dict) and pick.get("kind") == "session.skill" and isinstance(pick.get("ref"), str):
+        return pick["ref"]
+    return params.get("skillId") if isinstance(params.get("skillId"), str) else None
 
 
 def _evaluate(skill: _Skill, edit_list: list, *, ids, tool_set: set) -> tuple:
     """(apply result, {edit number: [problems]}, risk refusals) for one set of edits."""
-    result = edits.apply(skill.current, edit_list, limits=skill.limits)
+    result = edits.apply(skill.current, edit_list, limits=skill.limits, measure=skill.measure)
     problems: dict = {}
     for refusal in result.refused:
         problems.setdefault(refusal.index, []).append(refusal.problem())
@@ -123,7 +151,7 @@ def _stats(calls: dict, *, lessons=0, dropped_lessons=0, edits_kept=0, dropped_e
 async def analyze_session(ctx, params):
     sdk = ctx.sdk
     params = params if isinstance(params, dict) else {}
-    requested = params.get("skillId") if isinstance(params.get("skillId"), str) else None
+    requested = _requested(params)
 
     # 1-2. The session, and the skill it used.
     transcript = await sdk.session.read()
@@ -132,6 +160,8 @@ async def analyze_session(ctx, params):
     view = TranscriptView.from_transcript(transcript)
     pick = skill_pick.choose(view, requested)
     skill_id = pick["skillId"]
+    kind, point, target = pick["kind"], pick["point"], pick["target"]
+    user = kind == "user"
 
     # 3. The version that applies for this project, and the pending cap before any model call.
     skill = await _read_skill(sdk, skill_id)
@@ -140,8 +170,12 @@ async def analyze_session(ctx, params):
         raise PluginError("too_many_pending", f"There are already {MAX_PENDING} proposals for {name} waiting for a "
                                               "decision. Approve, reject or delete one first.")
     pick = dict(pick, name=name)
-    predates = skill_pick.predates_active(pick, skill.active)
-    shown = {"Skill": f"{name} ({skill_id})", "Current version": f"v{skill.from_revision}"}
+    if user:
+        shown = {"Skill": f"{name} (your skill)", "Current version": name}
+        version_label = "its current text"
+    else:
+        shown = {"Skill": f"{name} ({skill_id})", "Current version": f"v{skill.from_revision}"}
+        version_label = f"v{skill.from_revision}"
 
     # 4. Tell the person which skill was chosen (F-11).
     await sdk.jobs.progress("Reading the session", {**shown, "Stage": "1 of 3"})
@@ -149,14 +183,14 @@ async def analyze_session(ctx, params):
     # 5-6. The digest and the session's identifiers.
     parts_chars = sum(len(t) for t in skill.current.values())
     budget = max(DIGEST_MIN_CHARS, min(digest.DIGEST_MAX_CHARS,
-                                       prompts.MAX_PROMPT_CHARS - len(prompts.SYSTEM_A) - parts_chars - 10_000))
+                                       prompts.MAX_PROMPT_CHARS - len(prompts.system_a(kind)) - parts_chars - 10_000))
     d = digest.build(view, pick, budget=budget)
     ids = identifiers.extract(view, exclude_texts=list(skill.factory.values()) + list(skill.current.values()))
 
     # 7. Stage A: lessons.
-    version_label = f"v{skill.from_revision}"
     a = await llm_json.ask(sdk, prompts.messages_a(skill_id=skill_id, name=name, version_label=version_label,
-                                                   parts=skill.views(), summary=d.summary, digest_text=d.text),
+                                                   parts=skill.views(), summary=d.summary, digest_text=d.text,
+                                                   kind=kind),
                            llm_json.check_diagnosis, max_tokens=A_MAX_TOKENS, temperature=TEMPERATURE)
     diagnosis = a["value"]
     model_used = a["model"]
@@ -180,7 +214,8 @@ async def analyze_session(ctx, params):
                                    factory_texts=list(skill.factory.values()) + list(skill.current.values()))
     tool_set = set(tool_list)
     messages_b = prompts.messages_b(tool_list=tool_list, max_added_chars=EDIT_PROMPT_ADDED_CHARS, skill_id=skill_id,
-                                    name=name, version_label=version_label, lessons=lessons, parts=skill.views())
+                                    name=name, version_label=version_label, lessons=lessons, parts=skill.views(),
+                                    kind=kind)
     b = await llm_json.ask(sdk, messages_b, llm_json.check_edits, max_tokens=B_MAX_TOKENS, temperature=TEMPERATURE)
     calls["edit"] = b["attempts"]
     first_edits = b["value"]["edits"]
@@ -219,15 +254,22 @@ async def analyze_session(ctx, params):
     summary = guard.redact(summary, ids)
     changelog = [guard.redact(c, ids) for c in changelog]
 
+    def predates(current_skill: _Skill) -> bool:
+        if user:
+            return skill_pick.predates_text(pick, current_skill.current.get("body", ""))
+        return skill_pick.predates_active(pick, current_skill.active)
+
     async def propose(current_skill: _Skill, parts: dict) -> dict:
-        note = proposal.note(summary=summary, changelog=changelog, name=name, from_label=f"v{current_skill.from_revision}",
+        from_label = "its current text" if user else f"v{current_skill.from_revision}"
+        note = proposal.note(summary=summary, changelog=changelog, name=name, from_label=from_label,
                              lessons=len(lessons), dropped=dropped_lessons + dropped_edits)
         meta_out = proposal.meta(summary=summary, changelog=changelog, lessons=lessons, guard=guard_counts,
                                  source_session_id=meta.get("id"), high_water_seq=meta.get("highWaterSeq"),
                                  session_revision=pick.get("revision"),
-                                 predates_active=skill_pick.predates_active(pick, current_skill.active),
-                                 model_used=model_used, skiller_version=SKILLER_VERSION)
-        return await sdk.override.propose(POINT, skill_id, storable(parts), note=storable(note),
+                                 predates_active=predates(current_skill),
+                                 model_used=model_used, skiller_version=SKILLER_VERSION,
+                                 skill_kind=kind, source_skill_name=name if user else None)
+        return await sdk.override.propose(point, target, storable(parts), note=storable(note),
                                           meta=storable(meta_out), scope="user")
 
     parts = proposal.snapshot(skill.factory, skill.current, edited)
@@ -236,17 +278,22 @@ async def analyze_session(ctx, params):
     except PluginError as e:
         if e.code != "factory_changed":
             raise
-        # A RedAmon update changed the factory text meanwhile: redo the same edits on the new
-        # text once (no new model call); the old wording must not ride past the update.
+        # The text changed meanwhile (a RedAmon update of a built-in skill, or the person editing
+        # their own): redo the same edits on the new text once (no new model call); the old
+        # wording must not ride past the change.
         skill = await _read_skill(sdk, skill_id)
         result, _kept, _dropped, _ = _settle(skill, kept, ids=ids, tool_set=tool_set)
         edited = {pid: text for pid, text in result.parts.items() if text != skill.current[pid]}
         if not edited:
-            raise PluginError("factory_changed", f"RedAmon was updated while Skiller worked and its edits no longer "
-                                                 f"fit {name}. Run Skiller again.") from None
+            why = (f"{name} was edited while Skiller worked and its edits no longer fit it" if user
+                   else f"RedAmon was updated while Skiller worked and its edits no longer fit {name}")
+            raise PluginError("factory_changed", f"{why}. Run Skiller again.") from None
         out = await propose(skill, proposal.snapshot(skill.factory, skill.current, edited))
 
-    label = out.get("proposedRevisionLabel") or f"v{skill.from_revision + 1}"
+    if user:
+        message = f"Skiller proposes a new version of {name}."
+    else:
+        message = f"Skiller proposes {out.get('proposedRevisionLabel') or f'v{skill.from_revision + 1}'} of {name}."
     return {"status": "proposed", "skillId": skill_id,
-            "reviewProposal": {"extensionPoint": POINT, "changeSetId": out["changeSetId"]},
-            "message": f"Skiller proposes {label} of {name}.", "stats": stats}
+            "reviewProposal": {"extensionPoint": point, "changeSetId": out["changeSetId"]},
+            "message": message, "stats": stats}

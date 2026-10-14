@@ -1,0 +1,496 @@
+{
+ "skillId": "user_skill:__USER_SKILL_ID__",
+ "userSkill": {
+  "name": "Eval object access checklist",
+  "description": "Checks API endpoints that take an object id for access by another account.",
+  "content": "# Object access checklist\n1. List the API endpoints that take an object id, with execute_curl.\n2. For each, request an object of another account and compare the answer with your own.\n3. Fuzz the id range with ffuf when the ids are sequential.\nReport only what you can show with two accounts. Do not test hosts outside the scope.\n"
+ },
+ "plantedMistakes": [
+  {
+   "id": "M1",
+   "kind": "hang",
+   "keywords": [
+    "wordlist",
+    "threads",
+    "timeout",
+    "time out",
+    "smaller",
+    "hang"
+   ]
+  },
+  {
+   "id": "M2",
+   "kind": "repeat",
+   "keywords": [
+    "same id",
+    "repeat",
+    "forbidden",
+    "403",
+    "again",
+    "family"
+   ]
+  },
+  {
+   "id": "M3",
+   "kind": "verify",
+   "keywords": [
+    "two accounts",
+    "second account",
+    "owner",
+    "200 alone",
+    "status alone",
+    "verify",
+    "proof"
+   ]
+  },
+  {
+   "id": "M4",
+   "kind": "guidance",
+   "keywords": [
+    "second account",
+    "another account",
+    "own object",
+    "compare"
+   ]
+  }
+ ],
+ "plantedIdentifiers": [
+  "portal.example.org",
+  "198.51.100.61",
+  "/api/v2/invoices",
+  "4412",
+  "acct-17",
+  "acct-18",
+  "session_eval_user_0000000001"
+ ],
+ "transcript": {
+  "meta": {
+   "id": "session_eval_user_0000000001",
+   "title": "Object access on portal.example.org",
+   "status": "active",
+   "currentPhase": "exploitation",
+   "iterationCount": 7,
+   "createdAt": "2026-10-10T09:00:00Z",
+   "updatedAt": "2026-10-10T09:01:46.000Z",
+   "running": false,
+   "highWaterSeq": 33
+  },
+  "events": [
+   {
+    "seq": 1,
+    "type": "user_message",
+    "at": "2026-10-10T09:00:07.000Z",
+    "data": {
+     "content": "Use my object access checklist on portal.example.org (198.51.100.61)."
+    }
+   },
+   {
+    "seq": 2,
+    "type": "phase_update",
+    "at": "2026-10-10T09:00:08.000Z",
+    "data": {
+     "current_phase": "informational",
+     "iteration_count": 0,
+     "attack_path_type": "",
+     "skill_workflow": null
+    }
+   },
+   {
+    "seq": 3,
+    "type": "phase_update",
+    "at": "2026-10-10T09:00:09.000Z",
+    "data": {
+     "current_phase": "informational",
+     "iteration_count": 1,
+     "attack_path_type": "user_skill:__USER_SKILL_ID__",
+     "skill_workflow": {
+      "skillId": "user_skill:__USER_SKILL_ID__",
+      "kind": "user",
+      "contentSha256": "291bc3b9775e30e8"
+     }
+    }
+   },
+   {
+    "seq": 4,
+    "type": "thinking",
+    "at": "2026-10-10T09:00:16.000Z",
+    "data": {
+     "iteration": 1,
+     "phase": "informational",
+     "thought": "List the endpoints.",
+     "reasoning": "Reasoning for turn 1.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "green",
+     "stall": 0
+    }
+   },
+   {
+    "seq": 5,
+    "type": "tool_start",
+    "at": "2026-10-10T09:00:17.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4410'"
+     },
+     "step_id": "step-0001-execute_curl"
+    }
+   },
+   {
+    "seq": 7,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:00:20.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": true,
+     "output_summary": "The invoice endpoint takes a numeric id.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4410'"
+     },
+     "raw_output": "{\"id\": 4410, \"owner\": \"acct-17\"}",
+     "step_id": "step-0001-execute_curl"
+    }
+   },
+   {
+    "seq": 8,
+    "type": "thinking",
+    "at": "2026-10-10T09:00:27.000Z",
+    "data": {
+     "iteration": 2,
+     "phase": "informational",
+     "thought": "Fuzz every id with a huge list and many threads.",
+     "reasoning": "Reasoning for turn 2.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "orange",
+     "stall": 1
+    }
+   },
+   {
+    "seq": 9,
+    "type": "tool_start",
+    "at": "2026-10-10T09:00:28.000Z",
+    "data": {
+     "tool_name": "kali_shell",
+     "tool_args": {
+      "command": "ffuf -u 'http://portal.example.org/api/v2/invoices/FUZZ' -w /usr/share/seclists/ids-10M.txt -t 200"
+     },
+     "step_id": "step-0002-kali_shell"
+    }
+   },
+   {
+    "seq": 11,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:00:31.000Z",
+    "data": {
+     "tool_name": "kali_shell",
+     "success": false,
+     "output_summary": "ffuf timed out.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 600000,
+     "tool_args": {
+      "command": "ffuf -u 'http://portal.example.org/api/v2/invoices/FUZZ' -w /usr/share/seclists/ids-10M.txt -t 200"
+     },
+     "raw_output": "[ERR] timeout\n:: Progress: [3/10000000] :: Errors: 3",
+     "step_id": "step-0002-kali_shell"
+    }
+   },
+   {
+    "seq": 12,
+    "type": "thinking",
+    "at": "2026-10-10T09:00:38.000Z",
+    "data": {
+     "iteration": 3,
+     "phase": "informational",
+     "thought": "Request the next invoice.",
+     "reasoning": "Reasoning for turn 3.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "orange",
+     "stall": 2
+    }
+   },
+   {
+    "seq": 13,
+    "type": "tool_start",
+    "at": "2026-10-10T09:00:39.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "step_id": "step-0003-execute_curl"
+    }
+   },
+   {
+    "seq": 15,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:00:42.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": false,
+     "output_summary": "Forbidden.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "raw_output": "{\"error\": \"forbidden\"}",
+     "step_id": "step-0003-execute_curl"
+    }
+   },
+   {
+    "seq": 16,
+    "type": "thinking",
+    "at": "2026-10-10T09:00:49.000Z",
+    "data": {
+     "iteration": 4,
+     "phase": "informational",
+     "thought": "Request the next invoice.",
+     "reasoning": "Reasoning for turn 4.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "red",
+     "stall": 3
+    }
+   },
+   {
+    "seq": 17,
+    "type": "tool_start",
+    "at": "2026-10-10T09:00:50.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "step_id": "step-0004-execute_curl"
+    }
+   },
+   {
+    "seq": 19,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:00:53.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": false,
+     "output_summary": "Forbidden.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "raw_output": "{\"error\": \"forbidden\"}",
+     "step_id": "step-0004-execute_curl"
+    }
+   },
+   {
+    "seq": 20,
+    "type": "thinking",
+    "at": "2026-10-10T09:01:00.000Z",
+    "data": {
+     "iteration": 5,
+     "phase": "informational",
+     "thought": "Request the next invoice.",
+     "reasoning": "Reasoning for turn 5.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "red",
+     "stall": 4
+    }
+   },
+   {
+    "seq": 21,
+    "type": "tool_start",
+    "at": "2026-10-10T09:01:01.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "step_id": "step-0005-execute_curl"
+    }
+   },
+   {
+    "seq": 22,
+    "type": "guidance",
+    "at": "2026-10-10T09:01:08.000Z",
+    "data": {
+     "content": "Log in as the second account and request its own invoice id 4412 from the first account's session.",
+     "isGuidance": true
+    }
+   },
+   {
+    "seq": 23,
+    "type": "phase_update",
+    "at": "2026-10-10T09:01:09.000Z",
+    "data": {
+     "current_phase": "exploitation",
+     "iteration_count": 6,
+     "attack_path_type": "user_skill:__USER_SKILL_ID__",
+     "skill_workflow": {
+      "skillId": "user_skill:__USER_SKILL_ID__",
+      "kind": "user",
+      "contentSha256": "291bc3b9775e30e8"
+     }
+    }
+   },
+   {
+    "seq": 24,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:01:11.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": false,
+     "output_summary": "Forbidden.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4411'"
+     },
+     "raw_output": "{\"error\": \"forbidden\"}",
+     "step_id": "step-0005-execute_curl"
+    }
+   },
+   {
+    "seq": 25,
+    "type": "thinking",
+    "at": "2026-10-10T09:01:18.000Z",
+    "data": {
+     "iteration": 6,
+     "phase": "exploitation",
+     "thought": "Report broken access control because one id answered 200.",
+     "reasoning": "Reasoning for turn 6.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "green",
+     "stall": 0
+    }
+   },
+   {
+    "seq": 26,
+    "type": "tool_start",
+    "at": "2026-10-10T09:01:19.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4409'"
+     },
+     "step_id": "step-0006-execute_curl"
+    }
+   },
+   {
+    "seq": 28,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:01:22.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": true,
+     "output_summary": "200 OK.",
+     "actionable_findings": [
+      "Object access on http://portal.example.org/api/v2/invoices"
+     ],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s 'http://portal.example.org/api/v2/invoices/4409'"
+     },
+     "raw_output": "{\"id\": 4409, \"owner\": \"acct-17\"}",
+     "step_id": "step-0006-execute_curl"
+    }
+   },
+   {
+    "seq": 29,
+    "type": "thinking",
+    "at": "2026-10-10T09:01:29.000Z",
+    "data": {
+     "iteration": 7,
+     "phase": "exploitation",
+     "thought": "Compare with the second account.",
+     "reasoning": "Reasoning for turn 7.",
+     "action": "use_tool",
+     "input_tokens": 4200,
+     "output_tokens": 310,
+     "productivity_score": 0.7,
+     "productivity_tier": "green",
+     "stall": 0
+    }
+   },
+   {
+    "seq": 30,
+    "type": "tool_start",
+    "at": "2026-10-10T09:01:30.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "tool_args": {
+      "args": "-s -H 'Cookie: sid=acct-17' 'http://portal.example.org/api/v2/invoices/4412'"
+     },
+     "step_id": "step-0007-execute_curl"
+    }
+   },
+   {
+    "seq": 31,
+    "type": "tool_complete",
+    "at": "2026-10-10T09:01:32.000Z",
+    "data": {
+     "tool_name": "execute_curl",
+     "success": true,
+     "output_summary": "Another account's invoice is returned: confirmed.",
+     "actionable_findings": [],
+     "recommended_next_steps": [],
+     "duration_ms": 900,
+     "tool_args": {
+      "args": "-s -H 'Cookie: sid=acct-17' 'http://portal.example.org/api/v2/invoices/4412'"
+     },
+     "raw_output": "{\"id\": 4412, \"owner\": \"acct-18\"}",
+     "step_id": "step-0007-execute_curl"
+    }
+   },
+   {
+    "seq": 32,
+    "type": "assistant_message",
+    "at": "2026-10-10T09:01:39.000Z",
+    "data": {
+     "content": "Broken access control on portal.example.org: invoice 4412 of acct-18 read as acct-17.",
+     "phase": "exploitation",
+     "task_complete": true,
+     "response_tier": "full_report"
+    }
+   },
+   {
+    "seq": 33,
+    "type": "task_complete",
+    "at": "2026-10-10T09:01:46.000Z",
+    "data": {
+     "message": "Task completed successfully",
+     "final_phase": "exploitation",
+     "total_iterations": 7
+    }
+   }
+  ],
+  "truncated": {
+   "keptEvents": 28,
+   "droppedEvents": 5
+  },
+  "untrusted": true
+ }
+}

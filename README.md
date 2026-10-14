@@ -20,22 +20,27 @@ README has the details.
 
 <img src="skiller/icon.jpg" alt="Skiller" width="120" align="left">
 
-Skiller proposes better versions of RedAmon's built-in skills (the attack playbooks the agent
-follows, for example SQL injection), learned from real work. Start it from the gear menu of a
-finished chat session: it reads the session, picks the built-in skill the agent used, and drafts
-a new version of it, a few small edits drawn from what worked and what did not. The edits are
-**session-agnostic**: nothing from that target (hosts, addresses, paths, parameters,
-credentials) may enter them, because the playbook runs against every future target.
+Skiller proposes better versions of the skills the agent follows, learned from real work: RedAmon's
+built-in skills (the attack playbooks, for example SQL injection) and your own skills (the `.md`
+workflows you upload). Start it from the gear menu of a finished chat session: you pick one of the
+skills the agent used there, and Skiller drafts a new version of it, a few small edits drawn from
+what worked and what did not. The edits are **session-agnostic**: nothing from that target (hosts,
+addresses, paths, parameters, credentials) may enter them, because the skill runs against every
+future target.
 
 A person reviews every proposal next to the text it replaces, and nothing changes until they
-approve it; **Reset to factory** always brings the original text back. Skiller stores nothing
-of the session.
+approve it. For a built-in skill, **Reset to factory** always brings the original text back; for
+your own skill, saving creates a new skill and the original is never changed. Skiller stores
+nothing of the session.
 
 <br clear="left">
 
 - **Permissions:** `session:read` (read the session it was started from), `llm:invoke` (call
   the model chosen for Skiller in **Settings → Models by feature**), `override:skill.text`
-  (propose a new version of a skill's text).
+  (propose a new version of a built-in skill's text), `override:user_skill.text` (propose a new
+  version of one of your own skills that the session used, saved as a new skill when approved).
+- **Needs:** RedAmon plugin platform 1.1.0 for Skiller 1.1.0; RedAmon 1.0.0 instances keep
+  Skiller 1.0.0 (built-in skills only).
 - **Runs:** as a background job of up to 10 minutes, with two to four model calls.
 - **Read more:** [`skiller/README.md`](skiller/README.md) ·
   [wiki: Plugin-Skiller](https://github.com/samugit83/redamon/wiki/Plugin-Skiller)

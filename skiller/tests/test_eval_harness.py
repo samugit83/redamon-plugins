@@ -162,6 +162,8 @@ class _FakeRedAmon(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         self._record()
+        if self.path == "/api/users/u1/attack-skills":
+            return self._answer(201, {"id": "cevalskill0000000000000001", "name": self.headers.get("X-Name") or "x"})
         if self.path.startswith("/api/conversations/by-session/"):
             return self._answer(201, {"count": 3, "conversationId": "conv-1"})
         if self.path == "/api/plugins/skiller/actions/analyze_session":
@@ -208,3 +210,30 @@ def test_one_run_against_a_fake_redamon(monkeypatch):
     assert deletes == ["/api/plugins/overrides/change-sets/cs-1", "/api/conversations/conv-1"]
     assert row["outcome"] == "proposed" and row["leaks"] == [] and row["templateValid"] is True
     assert any("Reading the session" in line for line in logs)
+
+
+def test_a_user_skill_run_creates_the_skill_picks_it_and_cleans_up(monkeypatch):
+    _FakeRedAmon.calls, _FakeRedAmon.job_polls = [], 0
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _FakeRedAmon)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(run_eval.time, "sleep", lambda s: None)
+    try:
+        api = run_eval.Api(f"http://127.0.0.1:{server.server_address[1]}", cookie="tok", internal_key="ik")
+        run_eval.run_one(api, SESSIONS["user_skill"], project_id="p1", user_id="u1", keep=False, log=lambda m: None)
+    finally:
+        server.shutdown()
+    calls = _FakeRedAmon.calls
+    create, seed, action = calls[0], calls[1], calls[2]
+    assert create["path"] == "/api/users/u1/attack-skills" and create["cookie"] == "redamon-auth=tok"
+    assert create["body"]["content"] == SESSIONS["user_skill"]["userSkill"]["content"]
+    seeded = json.dumps(seed["body"])
+    assert run_eval.USER_SKILL_PLACEHOLDER not in seeded and "user_skill:cevalskill0000000000000001" in seeded
+    assert action["body"]["params"] == {"pick": {"kind": "session.skill", "ref": "user_skill:cevalskill0000000000000001"}}
+    deletes = [c["path"] for c in calls if c["method"] == "DELETE"]
+    assert deletes[-1] == "/api/users/u1/attack-skills/cevalskill0000000000000001"
+
+
+def test_the_user_skill_session_records_the_text_it_names():
+    spec = SESSIONS["user_skill"]
+    pick = skill_pick.choose(TranscriptView.from_transcript(spec["transcript"]))
+    assert pick["kind"] == "user" and pick["contentSha256"] == skill_pick.content_sha16(spec["userSkill"]["content"])

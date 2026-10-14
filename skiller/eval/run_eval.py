@@ -192,18 +192,42 @@ class Api:
             return status, None
 
 
+USER_SKILL_PLACEHOLDER = "__USER_SKILL_ID__"
+
+
+def with_user_skill(spec: dict, skill_id: str) -> dict:
+    """The spec with the created user skill's id in place of the placeholder (label and record)."""
+    text = json.dumps(spec).replace(USER_SKILL_PLACEHOLDER, skill_id)
+    return json.loads(text)
+
+
 def run_one(api: Api, spec: dict, *, project_id: str, user_id: str, keep: bool, log) -> dict:
-    session_id = f"session_eval_{spec['skillId']}_{secrets.token_hex(6)}"
+    params: dict = {}
+    skill_id = None
+    if spec.get("userSkill"):
+        own = spec["userSkill"]
+        body = {"name": f"{own['name']} {secrets.token_hex(3)}", "description": own["description"],
+                "content": own["content"]}
+        status, created = api.call("POST", f"/api/users/{user_id}/attack-skills", body)
+        if status != 201:
+            raise RuntimeError(f"creating the user skill failed: HTTP {status} {created}")
+        skill_id = created["id"]
+        spec = with_user_skill(spec, skill_id)
+        # The person's pick in RedAmon's skill picker; the action re-derives it from the session.
+        params = {"pick": {"kind": "session.skill", "ref": spec["skillId"]}}
+    session_id = f"session_eval_{secrets.token_hex(6)}" if skill_id else f"session_eval_{spec['skillId']}_{secrets.token_hex(6)}"
     status, seeded = api.call("POST", f"/api/conversations/by-session/{session_id}/messages",
                               seed_body(spec, project_id, user_id), internal=True)
     if status != 201:
+        if skill_id and not keep:
+            api.call("DELETE", f"/api/users/{user_id}/attack-skills/{skill_id}")
         raise RuntimeError(f"seeding {spec['skillId']} failed: HTTP {status} {seeded}")
     conversation_id = seeded["conversationId"]
     review = None
     job = None
     try:
         status, started = api.call("POST", "/api/plugins/skiller/actions/analyze_session",
-                                   {"context": {"projectId": project_id, "sessionId": session_id}, "params": {}})
+                                   {"context": {"projectId": project_id, "sessionId": session_id}, "params": params})
         if status not in (200, 202):
             return dict(score(spec, {"status": "refused", "error": started}, None), httpStatus=status)
         job_id = started["jobId"]
@@ -228,6 +252,8 @@ def run_one(api: Api, spec: dict, *, project_id: str, user_id: str, keep: bool, 
     finally:
         if not keep:
             api.call("DELETE", f"/api/conversations/{conversation_id}")
+            if skill_id:
+                api.call("DELETE", f"/api/users/{user_id}/attack-skills/{skill_id}")
 
 
 def table(rows: list) -> str:

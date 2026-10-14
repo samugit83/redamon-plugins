@@ -9,6 +9,12 @@ with four planted mistakes, the ones the evaluation looks for in Skiller's lesso
 - `guidance`: a person correcting the agent.
 `plantedIdentifiers` are the session-specific values that must never reach a proposal; the
 rubric's keywords map a lesson to a mistake (README.md, "Rubric").
+
+`user_skill` runs on one of the person's own skills (platform 1.1.0): its spec also carries
+`userSkill {name, description, content}`, which run_eval.py creates first, and its transcript
+names the skill as USER_SKILL_PLACEHOLDER, replaced by the created skill's id at run time. The
+agent's record of the skill's text (`contentSha256`) does not depend on the id, so it is built
+here.
 """
 
 from __future__ import annotations
@@ -20,9 +26,10 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "tests" / "fixtures"))
 
-from sessions_build import Session  # noqa: E402
+from sessions_build import Session, user_record  # noqa: E402
 
 OUT = HERE / "sessions"
+USER_SKILL_PLACEHOLDER = "__USER_SKILL_ID__"
 
 
 def sql_injection() -> dict:
@@ -137,7 +144,52 @@ def xss() -> dict:
     }
 
 
-SESSIONS = {"sql_injection": sql_injection, "path_traversal": path_traversal, "xss": xss}
+def user_skill() -> dict:
+    host, ip = "portal.example.org", "198.51.100.61"
+    text = ("# Object access checklist\n"
+            "1. List the API endpoints that take an object id, with execute_curl.\n"
+            "2. For each, request an object of another account and compare the answer with your own.\n"
+            "3. Fuzz the id range with ffuf when the ids are sequential.\n"
+            "Report only what you can show with two accounts. Do not test hosts outside the scope.\n")
+    ref = f"user_skill:{USER_SKILL_PLACEHOLDER}"
+    s = Session("session_eval_user_0000000001", f"Object access on {host}")
+    s.user(f"Use my object access checklist on {host} ({ip}).")
+    s.classify(ref, user_record(text, USER_SKILL_PLACEHOLDER))
+    s.turn("List the endpoints.", "execute_curl", {"args": f"-s 'http://{host}/api/v2/invoices/4410'"},
+           raw='{"id": 4410, "owner": "acct-17"}', summary="The invoice endpoint takes a numeric id.")
+    s.turn("Fuzz every id with a huge list and many threads.", "kali_shell",
+           {"command": f"ffuf -u 'http://{host}/api/v2/invoices/FUZZ' -w /usr/share/seclists/ids-10M.txt -t 200"},
+           ok=False, raw="[ERR] timeout\n:: Progress: [3/10000000] :: Errors: 3", summary="ffuf timed out.",
+           ms=600_000, tier="orange", stall=1)
+    for i in range(3):
+        s.turn("Request the next invoice.", "execute_curl", {"args": f"-s 'http://{host}/api/v2/invoices/4411'"},
+               ok=False, raw='{"error": "forbidden"}', summary="Forbidden.", tier="red" if i else "orange", stall=2 + i)
+    s.guidance("Log in as the second account and request its own invoice id 4412 from the first account's session.")
+    s.turn("Report broken access control because one id answered 200.", "execute_curl",
+           {"args": f"-s 'http://{host}/api/v2/invoices/4409'"}, raw='{"id": 4409, "owner": "acct-17"}',
+           summary="200 OK.", findings=[f"Object access on http://{host}/api/v2/invoices"], phase="exploitation")
+    s.turn("Compare with the second account.", "execute_curl",
+           {"args": f"-s -H 'Cookie: sid=acct-17' 'http://{host}/api/v2/invoices/4412'"},
+           raw='{"id": 4412, "owner": "acct-18"}', summary="Another account's invoice is returned: confirmed.")
+    s.report(f"Broken access control on {host}: invoice 4412 of acct-18 read as acct-17.")
+    return {
+        "skillId": ref,
+        "userSkill": {"name": "Eval object access checklist",
+                      "description": "Checks API endpoints that take an object id for access by another account.",
+                      "content": text},
+        "plantedMistakes": [
+            {"id": "M1", "kind": "hang", "keywords": ["wordlist", "threads", "timeout", "time out", "smaller", "hang"]},
+            {"id": "M2", "kind": "repeat", "keywords": ["same id", "repeat", "forbidden", "403", "again", "family"]},
+            {"id": "M3", "kind": "verify", "keywords": ["two accounts", "second account", "owner", "200 alone",
+                                                        "status alone", "verify", "proof"]},
+            {"id": "M4", "kind": "guidance", "keywords": ["second account", "another account", "own object", "compare"]},
+        ],
+        "plantedIdentifiers": [host, ip, "/api/v2/invoices", "4412", "acct-17", "acct-18", "session_eval_user_0000000001"],
+        "transcript": s.transcript(),
+    }
+
+
+SESSIONS = {"sql_injection": sql_injection, "path_traversal": path_traversal, "xss": xss, "user_skill": user_skill}
 
 
 def render(name: str) -> str:

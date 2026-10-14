@@ -39,6 +39,23 @@ FLAG = "FLAG{synthetic_sqli_flag_7a1}"
 SESSION_ID = "session_5e1f7c2a9b3d4e60"
 TITLE = "Assess shop.example.com product search"
 
+# A person's own skill (user_skill:<id>), and the text the agent rendered from it: the agent
+# records the first 16 hex of the SHA-256 of that text (agentic skill_part_seam.py).
+USER_SKILL_ID = "cuserflow0000000000000001"
+USER_SKILL_NAME = "My SQLi flow v2"
+USER_SKILL_TEXT = ("# My SQLi flow\n"
+                   "1. Find the parameters of each form with execute_curl.\n"
+                   "2. Send a single quote to each and compare the error with the baseline.\n"
+                   "3. Run sqlmap on the parameter that broke: kali_shell with sqlmap -u '<url>' -p <param> --batch.\n"
+                   "Do not test hosts outside the scope.\n")
+
+
+def user_record(text: str = USER_SKILL_TEXT, skill_id: str = USER_SKILL_ID) -> dict:
+    import hashlib
+
+    return {"skillId": f"user_skill:{skill_id}", "kind": "user",
+            "contentSha256": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]}
+
 
 class Session:
     def __init__(self, sid: str, title: str, *, start: str = "2026-10-10T09:00:00Z", phase_shape: str = "current"):
@@ -289,6 +306,64 @@ def user_skill_only() -> dict:
     return s.transcript()
 
 
+def user_skill_workflow() -> dict:
+    """A user skill recorded by the agent (platform 1.1.0): every turn carries its record."""
+    s = Session("session_userflow0000001", "Own SQLi flow")
+    s.user(f"Use my flow on {HOST}.")
+    s.classify(f"user_skill:{USER_SKILL_ID}", user_record())
+    s.turn("Find the forms.", "execute_curl", {"args": f"-s 'http://{HOST}/search'"}, raw="<form>")
+    s.turn("Quote the parameter.", "execute_curl", {"args": f"-s 'http://{HOST}/search?q=%27'"},
+           raw="SQL syntax error", ok=True)
+    s.turn("sqlmap crawl.", "kali_shell", {"command": f"sqlmap -u 'http://{HOST}/' --crawl=3 --batch"},
+           raw="[WARNING] crawl stalled", ok=False, tier="red", stall=2)
+    s.turn("sqlmap on one parameter.", "kali_shell", {"command": f"sqlmap -u 'http://{HOST}/search?q=1' -p q --batch"},
+           raw="Parameter 'q' is vulnerable", findings=["SQL injection in parameter q"])
+    s.turn("Confirm.", "kali_shell", {"command": f"sqlmap -u 'http://{HOST}/search?q=1' -p q --dbs --batch"},
+           raw="available databases [2]")
+    s.report("Injection confirmed.")
+    return s.transcript()
+
+
+def mixed_builtin_user() -> dict:
+    """Three built-in turns, then four of the person's own skill."""
+    s = Session("session_mixed000000001", "Mixed skills")
+    s.user(f"Test {HOST}.")
+    s.classify("sql_injection")
+    for i in range(3):
+        s.turn(f"sqli {i}", "execute_curl", {"args": f"-s 'http://{HOST}/p{i}?id=%27'"}, raw="ok")
+    s.classify(f"user_skill:{USER_SKILL_ID}", user_record())
+    for i in range(4):
+        s.turn(f"own {i}", "kali_shell", {"command": f"sqlmap -u 'http://{HOST}/q{i}?id=1' --batch"}, raw="ok")
+    s.report("Done.")
+    return s.transcript()
+
+
+def user_skill_label_only() -> dict:
+    """Recorded before the agent recorded user skills: the label only, the record null."""
+    s = Session("session_userlabel000001", "Own flow, older agent")
+    s.user(f"Use my flow on {HOST}.")
+    s.classify(f"user_skill:{USER_SKILL_ID}", None)
+    s.turn("Recon.", "execute_curl", {"args": f"-s 'http://{HOST}/'"}, raw="ok")
+    s.turn("Probe.", "execute_curl", {"args": f"-s 'http://{HOST}/?id=%27'"}, raw="error", phase="exploitation")
+    s.turn("Loot.", "kali_shell", {"command": "id"}, raw="uid=33", phase="post_exploitation")
+    s.report("Done.")
+    return s.transcript()
+
+
+def user_skill_disabled_midway() -> dict:
+    """The skill was turned off after three turns: later turns keep the label but have no record."""
+    s = Session("session_userdisabled0001", "Own flow turned off")
+    s.user(f"Use my flow on {HOST}.")
+    s.classify(f"user_skill:{USER_SKILL_ID}", user_record())
+    for i in range(3):
+        s.turn(f"own {i}", "execute_curl", {"args": f"-s 'http://{HOST}/o{i}'"}, raw="ok")
+    s.classify(f"user_skill:{USER_SKILL_ID}", None)
+    for i in range(3):
+        s.turn(f"off {i}", "execute_curl", {"args": f"-s 'http://{HOST}/f{i}'"}, raw="ok")
+    s.report("Done.")
+    return s.transcript()
+
+
 def unclassified() -> dict:
     s = Session("session_unclass00000001", "Odd request")
     s.user("Look at the banner.")
@@ -513,6 +588,10 @@ SESSIONS = {
     "switch_midsession": switch_midsession,
     "tie": tie,
     "user_skill_only": user_skill_only,
+    "user_skill_workflow": user_skill_workflow,
+    "mixed_builtin_user": mixed_builtin_user,
+    "user_skill_label_only": user_skill_label_only,
+    "user_skill_disabled_midway": user_skill_disabled_midway,
     "unclassified": unclassified,
     "skill_not_rendered": skill_not_rendered,
     "too_short": too_short,

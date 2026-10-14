@@ -208,10 +208,16 @@ def summarize(signals: dict) -> str:
 
 # -- text sections ----------------------------------------------------------------------------
 
+def _skill_line(pick: dict) -> str:
+    name = pick.get('name') or skill_pick.display_name(pick['skillId'])
+    # A user skill's id says nothing to the model; its kind does.
+    return f"{name} (the person's own skill)" if pick.get("kind") == "user" else f"{name} ({pick['skillId']})"
+
+
 def _facts(view, pick: dict, skill_turns: list, warnings: list) -> list:
     phases = Counter(t.phase for t in skill_turns)
     lines = ["SESSION FACTS",
-             f"- skill: {pick.get('name') or skill_pick.display_name(pick['skillId'])} ({pick['skillId']}); turns "
+             f"- skill: {_skill_line(pick)}; turns "
              f"counted from {'the record of the playbook in the prompt' if pick.get('source') == 'workflow' else 'the skill label'}",
              f"- turns under this skill: {len(skill_turns)} of {len(view.turns)}"
              + (f" (#{skill_turns[0].iteration} to #{skill_turns[-1].iteration})" if skill_turns else ""),
@@ -425,8 +431,8 @@ def _search_lines(searches) -> list:
 def build(view, pick: dict, *, budget: int = DIGEST_MAX_CHARS, nonce: str | None = None) -> Digest:
     nonce = nonce or secrets.token_hex(8)
     numbers = set(pick.get("turns") or [])
-    skill_turns = [t for t in view.turns if t.n in numbers] if numbers else [
-        t for t in view.turns if skill_pick.turn_skill(t)[0] == pick.get("skillId")]
+    skill_turns = [t for t in view.turns if t.n in numbers] if numbers else (
+        skill_pick.counted_turns(view, pick.get("skillId")))
     by_n = {t.n: t for t in view.turns}
     teams = [(team, by_n[team.turn].iteration) for team in view.fireteams if team.turn in numbers]
     searches = [(s, by_n[s.turn].iteration) for s in view.searches if s.turn in numbers]

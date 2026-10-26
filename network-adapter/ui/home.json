@@ -1,0 +1,35 @@
+{
+  "type": "page",
+  "title": "Network Adapter · Playbook egress",
+  "children": [
+    {
+      "type": "markdown",
+      "content": {
+        "text": "**Plugin này làm đúng một việc: đề xuất nối playbook egress recovery vào skill built-in** (batch → egress_status → report_observation → request_recovery idempotent → poll enforcement_confirmed → batch tiếp). Bản đề nghị nằm trong change-set chờ admin duyệt; chưa duyệt thì chưa agent nào nhận.\n\nPlaybook viết cho bộ công cụ egress (MCP) do **operator tự triển khai và vận hành ngoài RedAmon** — plugin không đọc, không lưu và không điều khiển hạ tầng mạng nào."
+      }
+    },
+    {
+      "type": "form",
+      "title": "Playbook egress cho agent",
+      "fields": [
+        {
+          "name": "skill",
+          "label": "Skill built-in nhận playbook",
+          "kind": "select",
+          "required": true,
+          "options": [
+            {
+              "value": "brute_force_credential_guess",
+              "label": "brute_force_credential_guess (mặc định)"
+            }
+          ]
+        }
+      ],
+      "submit": {
+        "action": "propose_playbook",
+        "label": "Đề nghị nối playbook (chờ admin duyệt)"
+      },
+      "resultScreen": "ui/home.json"
+    }
+  ]
+}

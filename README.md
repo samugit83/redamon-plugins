@@ -16,6 +16,21 @@ releases it. The procedure is in [CONTRIBUTING.md](CONTRIBUTING.md). The section
 One block per plugin: what it does, what it may touch, where to read more. The plugin's own
 README has the details.
 
+### Network Adapter
+
+Network Adapter proposes an **egress recovery playbook** for the built-in skills, for operators
+who run their own egress layer: a separate MCP server (deployed and governed outside RedAmon)
+whose tools rotate the exit address when — and only when — the evidence says the target really
+blocked it. The plugin proposes appending the disciplined loop to the
+`brute_force_credential_guess` skill: small batches, read the route status, report what was seen
+(never a conclusion), one idempotent recovery request, wait for `enforcement_confirmed`, then the
+next batch; 429 backs off instead of rotating. A person approves the proposal in the review UI,
+and the plugin itself reads only the skill's factory text, stores nothing and touches no network
+infrastructure — see [network-adapter/README.md](network-adapter/README.md).
+
+- **Permissions:** `override:skill.text` (propose a new version of a built-in skill's text).
+- **Where it appears:** its own page in the nav (**Network Adapter**).
+
 ### Skiller
 
 <img src="skiller/icon.jpg" alt="Skiller" width="120" align="left">

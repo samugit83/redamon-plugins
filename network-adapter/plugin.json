@@ -1,0 +1,29 @@
+{
+  "id": "network-adapter",
+  "version": "1.0.0",
+  "displayName": "Network Adapter",
+  "description": "Đề xuất playbook 'vòng egress recovery' nối vào skill built-in (batch → status → observation → recovery idempotent → enforcement_confirmed). Dùng kèm bộ egress MCP do operator tự vận hành.",
+  "platform": ">=1.1.0 <2.0.0",
+  "dataVersion": 1,
+  "permissions": [
+    "override:skill.text"
+  ],
+  "actions": [
+    {
+      "id": "propose_playbook",
+      "entry": "engine/main.py:propose_playbook",
+      "timeoutSeconds": 120,
+      "resultScreen": "ui/home.json"
+    }
+  ],
+  "contributes": {
+    "nav": {
+      "label": "Network Adapter",
+      "icon": "settings",
+      "screen": "ui/home.json"
+    }
+  },
+  "screens": [
+    "ui/home.json"
+  ]
+}
